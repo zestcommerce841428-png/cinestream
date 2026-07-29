@@ -14,6 +14,11 @@ export const metadata: Metadata = buildMetadata({
   noIndex: true,
 });
 
+// This route is `force-dynamic` specifically so a fresh Math.random() pick runs on every
+// request — the react-hooks/purity rule is aimed at Client Component render purity for the
+// React Compiler and doesn't apply to a Server Component whose entire point is fresh
+// per-request randomness.
+/* eslint-disable react-hooks/purity */
 export default async function RandomPickerPage() {
   const randomPage = Math.floor(Math.random() * 20) + 1;
   const res = await tmdbClient.getRandomMovie(randomPage).catch(() => ({ results: [] }));

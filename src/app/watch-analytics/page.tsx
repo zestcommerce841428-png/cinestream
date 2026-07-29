@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Bookmark, Clock, Film, Tv, PieChart, Sparkles } from 'lucide-react';
+import { Bookmark, Clock, Film, PieChart } from 'lucide-react';
 import { useWatchlist } from '@/context/WatchlistContext';
 
 export default function WatchAnalyticsPage() {
