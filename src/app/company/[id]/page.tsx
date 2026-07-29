@@ -1,49 +1,52 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import type { Metadata } from 'next';
 import Image from 'next/image';
-import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { Building2, MapPin, Globe, Film } from 'lucide-react';
 import { tmdbClient, getImageUrl, Movie } from '@/services/tmdb';
 import MovieCard from '@/components/MovieCard';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function CompanyPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const companyId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [company, setCompany] = useState<any>(null);
-  const [movies, setMovies] = useState<Movie[]>([]);
-  const [loading, setLoading] = useState(true);
+interface CompanyPageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    async function loadCompany() {
-      if (!companyId) return;
-      setLoading(true);
-      try {
-        const [detailsRes, moviesRes] = await Promise.all([
-          tmdbClient.getCompanyDetails(companyId),
-          tmdbClient.getCompanyMovies(companyId).catch(() => ({ results: [] }))
-        ]);
-        setCompany(detailsRes);
-        setMovies(moviesRes.results || []);
-      } catch (e) {
-        console.error('Error fetching company', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadCompany();
-  }, [companyId]);
-
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading company profile...</div>;
-
-  if (!company) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">
-        <h2>Company not found</h2>
-      </div>
-    );
+async function getCompany(id: number) {
+  try {
+    const [company, moviesRes] = await Promise.all([
+      tmdbClient.getCompanyDetails(id),
+      tmdbClient.getCompanyMovies(id).catch(() => ({ results: [] })),
+    ]);
+    return { company, movies: (moviesRes.results || []) as Movie[] };
+  } catch {
+    return null;
   }
+}
+
+export async function generateMetadata({ params }: CompanyPageProps): Promise<Metadata> {
+  const { id } = await params;
+  const data = await getCompany(parseInt(id, 10));
+  if (!data) {
+    return { title: 'Company Not Found', robots: { index: false, follow: false } };
+  }
+  return buildMetadata({
+    title: data.company.name,
+    description: `${data.company.name} — production credits, filmography, and studio profile on CineStream.`,
+    path: `/company/${data.company.id}`,
+    image: data.company.logo_path ? getImageUrl(data.company.logo_path, 'w300') : null,
+  });
+}
+
+export default async function CompanyPage({ params }: CompanyPageProps) {
+  const { id } = await params;
+  const data = await getCompany(parseInt(id, 10));
+
+  if (!data) {
+    notFound();
+  }
+
+  const { company, movies } = data;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">

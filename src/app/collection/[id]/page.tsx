@@ -1,49 +1,52 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import type { Metadata } from 'next';
 import Image from 'next/image';
-import Link from 'next/link';
-import { Layers, DollarSign, Calendar, Star, Film } from 'lucide-react';
+import { notFound } from 'next/navigation';
+import { Layers, Film } from 'lucide-react';
 import { tmdbClient, getBackdropUrl, getImageUrl, Movie } from '@/services/tmdb';
 import MovieCard from '@/components/MovieCard';
+import { buildMetadata, truncateDescription } from '@/lib/metadata';
 
-export default function CollectionPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const collectionId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [collection, setCollection] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+interface CollectionPageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    async function loadCollection() {
-      if (!collectionId) return;
-      setLoading(true);
-      try {
-        const res = await tmdbClient.getCollectionDetails(collectionId);
-        setCollection(res);
-      } catch (err) {
-        console.error('Error loading collection', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadCollection();
-  }, [collectionId]);
-
-  if (loading) {
-    return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading collection details...</div>;
+async function getCollection(id: number) {
+  try {
+    return await tmdbClient.getCollectionDetails(id);
+  } catch {
+    return null;
   }
+}
+
+export async function generateMetadata({ params }: CollectionPageProps): Promise<Metadata> {
+  const { id } = await params;
+  const collection = await getCollection(parseInt(id, 10));
+  if (!collection) {
+    return { title: 'Collection Not Found', robots: { index: false, follow: false } };
+  }
+  return buildMetadata({
+    title: collection.name,
+    description: truncateDescription(collection.overview || `${collection.name} — full movie franchise collection on CineStream.`),
+    path: `/collection/${collection.id}`,
+    image: collection.poster_path ? getImageUrl(collection.poster_path, 'w780') : collection.backdrop_path ? getBackdropUrl(collection.backdrop_path, 'w1280') : null,
+  });
+}
+
+export default async function CollectionPage({ params }: CollectionPageProps) {
+  const { id } = await params;
+  const collection = await getCollection(parseInt(id, 10));
 
   if (!collection) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">
-        <h2>Collection not found</h2>
-        <Link href="/movies" className="text-brand-500 hover:underline mt-2 inline-block">Return to Movies</Link>
-      </div>
-    );
+    notFound();
   }
 
-  const parts: Movie[] = collection.parts || [];
+  const parts: Movie[] = (collection.parts || []).slice().sort((a: any, b: any) => {
+    const da = a.release_date ? new Date(a.release_date).getTime() : 0;
+    const db = b.release_date ? new Date(b.release_date).getTime() : 0;
+    return da - db;
+  });
 
   return (
     <div className="space-y-12">
@@ -86,7 +89,7 @@ export default function CollectionPage({ params }: { params: Promise<{ id: strin
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <h2 className="text-2xl font-bold text-white flex items-center space-x-2">
           <Film className="w-6 h-6 text-brand-500" />
-          <span>Franchise Titles</span>
+          <span>Franchise Titles (Chronological Order)</span>
         </h2>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">

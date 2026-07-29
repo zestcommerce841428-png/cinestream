@@ -1,47 +1,63 @@
-'use client';
-
-import React, { useEffect, useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Search, Film, Tv, User } from 'lucide-react';
-import { tmdbClient } from '@/services/tmdb';
-import MovieCard from '@/components/MovieCard';
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import { getImageUrl } from '@/services/tmdb';
+import { Search } from 'lucide-react';
+import { tmdbClient, getImageUrl } from '@/services/tmdb';
+import MovieCard from '@/components/MovieCard';
+import { buildMetadata } from '@/lib/metadata';
 
-function SearchContent() {
-  const searchParams = useSearchParams();
-  const query = searchParams.get('q') || '';
+export const revalidate = 3600;
 
-  const [inputQuery, setInputQuery] = useState(query);
-  const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'tv' | 'person'>('all');
-  const [results, setResults] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+const TABS = [
+  { key: 'all', label: 'All Results' },
+  { key: 'movie', label: 'Movies' },
+  { key: 'tv', label: 'TV Shows' },
+  { key: 'person', label: 'People' },
+] as const;
 
-  useEffect(() => {
-    setInputQuery(query);
-  }, [query]);
+type TabKey = (typeof TABS)[number]['key'];
 
-  useEffect(() => {
-    async function performSearch() {
-      if (!query.trim()) return;
-      setLoading(true);
-      try {
-        let res;
-        if (activeTab === 'movie') res = await tmdbClient.searchMovies(query);
-        else if (activeTab === 'tv') res = await tmdbClient.searchTV(query);
-        else if (activeTab === 'person') res = await tmdbClient.searchPeople(query);
-        else res = await tmdbClient.searchMulti(query);
+function resolveTab(raw?: string): TabKey {
+  return (TABS.find((t) => t.key === raw)?.key || 'all') as TabKey;
+}
 
-        setResults(res.results || []);
-      } catch (err) {
-        console.error('Search failed', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    performSearch();
-  }, [query, activeTab]);
+function fetchResults(query: string, tab: TabKey) {
+  switch (tab) {
+    case 'movie':
+      return tmdbClient.searchMovies(query);
+    case 'tv':
+      return tmdbClient.searchTV(query);
+    case 'person':
+      return tmdbClient.searchPeople(query);
+    default:
+      return tmdbClient.searchMulti(query);
+  }
+}
+
+interface SearchPageProps {
+  searchParams: Promise<{ q?: string; type?: string }>;
+}
+
+export async function generateMetadata({ searchParams }: SearchPageProps): Promise<Metadata> {
+  const { q } = await searchParams;
+  const query = q?.trim() || '';
+  return buildMetadata({
+    title: query ? `Search results for "${query}"` : 'Search',
+    description: query
+      ? `Movies, TV shows and people matching "${query}" on CineStream.`
+      : 'Search thousands of movies, TV shows, and people on CineStream.',
+    path: query ? `/search?q=${encodeURIComponent(query)}` : '/search',
+    noIndex: true,
+  });
+}
+
+export default async function SearchPage({ searchParams }: SearchPageProps) {
+  const { q, type } = await searchParams;
+  const query = q?.trim() || '';
+  const activeTab = resolveTab(type);
+
+  const res = query ? await fetchResults(query, activeTab).catch(() => ({ results: [] })) : { results: [] };
+  const results = res.results || [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -49,55 +65,32 @@ function SearchContent() {
       <div className="border-b border-gray-800 pb-6 space-y-4">
         <h1 className="text-3xl font-extrabold text-white tracking-tight flex items-center space-x-2">
           <Search className="w-7 h-7 text-brand-500" />
-          <span>Search Results for "{query}"</span>
+          <span>{query ? `Search Results for "${query}"` : 'Search'}</span>
         </h1>
 
         {/* Filter Tabs */}
         <div className="flex bg-gray-900 p-1.5 rounded-2xl border border-gray-800 self-start sm:w-fit">
-          <button
-            onClick={() => setActiveTab('all')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold ${
-              activeTab === 'all' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            All Results
-          </button>
-          <button
-            onClick={() => setActiveTab('movie')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold ${
-              activeTab === 'movie' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            Movies
-          </button>
-          <button
-            onClick={() => setActiveTab('tv')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold ${
-              activeTab === 'tv' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            TV Shows
-          </button>
-          <button
-            onClick={() => setActiveTab('person')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold ${
-              activeTab === 'person' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            People
-          </button>
+          {TABS.map((tab) => (
+            <Link
+              key={tab.key}
+              href={`/search?q=${encodeURIComponent(query)}${tab.key === 'all' ? '' : `&type=${tab.key}`}`}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
+                activeTab === tab.key ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {tab.label}
+            </Link>
+          ))}
         </div>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-          {Array.from({ length: 10 }).map((_, i) => (
-            <div key={i} className="aspect-[2/3] bg-gray-900 animate-pulse rounded-2xl border border-gray-800" />
-          ))}
+      {!query ? (
+        <div className="text-center py-20 bg-gray-900/50 rounded-2xl border border-gray-800">
+          <p className="text-gray-400">Use the search icon (or press Ctrl/Cmd + K) to look up movies, TV shows, and people.</p>
         </div>
       ) : results.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-          {results.map((item) => {
+          {results.map((item: any) => {
             const type = item.media_type || (activeTab === 'person' ? 'person' : activeTab === 'tv' ? 'tv' : 'movie');
 
             if (type === 'person') {
@@ -109,7 +102,13 @@ function SearchContent() {
                 >
                   <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-gray-950 mb-2">
                     {item.profile_path ? (
-                      <Image src={getImageUrl(item.profile_path, 'w185')} alt={item.name} fill className="object-cover group-hover:scale-105 transition-transform" />
+                      <Image
+                        src={getImageUrl(item.profile_path, 'w185')}
+                        alt={item.name}
+                        fill
+                        sizes="(max-width: 640px) 50vw, 20vw"
+                        className="object-cover group-hover:scale-105 transition-transform"
+                      />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs">No Image</div>
                     )}
@@ -135,17 +134,9 @@ function SearchContent() {
         </div>
       ) : (
         <div className="text-center py-20 bg-gray-900/50 rounded-2xl border border-gray-800">
-          <p className="text-gray-400">No results found for "{query}". Try searching another keyword.</p>
+          <p className="text-gray-400">No results found for &ldquo;{query}&rdquo;. Try searching another keyword.</p>
         </div>
       )}
     </div>
-  );
-}
-
-export default function SearchPage() {
-  return (
-    <Suspense fallback={<div className="p-10 text-gray-400">Loading Search...</div>}>
-      <SearchContent />
-    </Suspense>
   );
 }

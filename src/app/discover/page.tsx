@@ -1,63 +1,50 @@
-'use client';
-
-import React, { useEffect, useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Compass, Filter, RefreshCw } from 'lucide-react';
-import { tmdbClient, Movie } from '@/services/tmdb';
+import type { Metadata } from 'next';
+import { Compass } from 'lucide-react';
+import { tmdbClient } from '@/services/tmdb';
 import MovieCard from '@/components/MovieCard';
+import DiscoverFilters from '@/components/DiscoverFilters';
+import { buildMetadata } from '@/lib/metadata';
 
-function DiscoverContent() {
-  const searchParams = useSearchParams();
-  const initialGenre = searchParams.get('genre') || '';
+export const revalidate = 3600;
 
-  const [mediaType, setMediaType] = useState<'movie' | 'tv'>('movie');
-  const [selectedGenre, setSelectedGenre] = useState<string>(initialGenre);
-  const [year, setYear] = useState<string>('');
-  const [sortBy, setSortBy] = useState<string>('popularity.desc');
-  const [minRating, setMinRating] = useState<string>('0');
+interface DiscoverPageProps {
+  searchParams: Promise<{ type?: string; genre?: string; year?: string; sort?: string; rating?: string }>;
+}
 
-  const [genres, setGenres] = useState<{ id: number; name: string }[]>([]);
-  const [results, setResults] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+export async function generateMetadata({ searchParams }: DiscoverPageProps): Promise<Metadata> {
+  const sp = await searchParams;
+  const isFiltered = Boolean(sp.type || sp.genre || sp.year || sp.sort || sp.rating);
+  return buildMetadata({
+    title: 'Advanced Discover',
+    description: 'Filter and customize movie & TV titles by genre, year, rating, and sort order.',
+    path: '/discover',
+    // Index only the base, unfiltered page — the near-infinite filter permutations aren't
+    // worth indexing individually and would otherwise dilute crawl budget.
+    noIndex: isFiltered,
+  });
+}
 
-  useEffect(() => {
-    async function loadGenres() {
-      try {
-        const res = mediaType === 'movie' ? await tmdbClient.getMovieGenres() : await tmdbClient.getTVGenres();
-        setGenres(res.genres);
-      } catch (err) {
-        console.error('Error fetching genres', err);
-      }
-    }
-    loadGenres();
-  }, [mediaType]);
+export default async function DiscoverPage({ searchParams }: DiscoverPageProps) {
+  const sp = await searchParams;
+  const type: 'movie' | 'tv' = sp.type === 'tv' ? 'tv' : 'movie';
+  const genre = sp.genre || '';
+  const year = sp.year || '';
+  const sort = sp.sort || 'popularity.desc';
+  const rating = sp.rating || '0';
 
-  const handleDiscover = async () => {
-    setLoading(true);
-    try {
-      const params: Record<string, any> = {
-        sort_by: sortBy,
-        'vote_average.gte': minRating,
-      };
+  const genresRes = await (type === 'movie' ? tmdbClient.getMovieGenres() : tmdbClient.getTVGenres());
 
-      if (selectedGenre) params.with_genres = selectedGenre;
-      if (year) {
-        if (mediaType === 'movie') params.primary_release_year = year;
-        else params.first_air_date_year = year;
-      }
-
-      const res = mediaType === 'movie' ? await tmdbClient.discoverMovies(params) : await tmdbClient.discoverTV(params);
-      setResults(res.results);
-    } catch (e) {
-      console.error('Discover error', e);
-    } finally {
-      setLoading(false);
-    }
+  const params: Record<string, string | number> = {
+    sort_by: sort,
+    'vote_average.gte': rating,
   };
+  if (genre) params.with_genres = genre;
+  if (year) {
+    if (type === 'movie') params.primary_release_year = year;
+    else params.first_air_date_year = year;
+  }
 
-  useEffect(() => {
-    handleDiscover();
-  }, [mediaType, selectedGenre, year, sortBy, minRating]);
+  const results = await (type === 'movie' ? tmdbClient.discoverMovies(params) : tmdbClient.discoverTV(params));
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -69,101 +56,19 @@ function DiscoverContent() {
         <p className="text-gray-400 text-sm mt-1">Filter and customize movie & TV titles by genre, year, rating, and sort order.</p>
       </div>
 
-      {/* Filter Controls Panel */}
-      <div className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
-        {/* Type */}
-        <div>
-          <label className="block text-xs font-semibold text-gray-400 mb-1.5">Type</label>
-          <select
-            value={mediaType}
-            onChange={(e) => {
-              setMediaType(e.target.value as any);
-              setSelectedGenre('');
-            }}
-            className="w-full bg-gray-950 text-sm text-gray-200 p-2.5 rounded-xl border border-gray-800 focus:outline-none"
-          >
-            <option value="movie">Movies</option>
-            <option value="tv">TV Shows</option>
-          </select>
-        </div>
+      <DiscoverFilters genres={genresRes.genres || []} type={type} genre={genre} year={year} sort={sort} rating={rating} />
 
-        {/* Genre */}
-        <div>
-          <label className="block text-xs font-semibold text-gray-400 mb-1.5">Genre</label>
-          <select
-            value={selectedGenre}
-            onChange={(e) => setSelectedGenre(e.target.value)}
-            className="w-full bg-gray-950 text-sm text-gray-200 p-2.5 rounded-xl border border-gray-800 focus:outline-none"
-          >
-            <option value="">All Genres</option>
-            {genres.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Year */}
-        <div>
-          <label className="block text-xs font-semibold text-gray-400 mb-1.5">Release Year</label>
-          <input
-            type="number"
-            placeholder="e.g. 2024"
-            value={year}
-            onChange={(e) => setYear(e.target.value)}
-            className="w-full bg-gray-950 text-sm text-gray-200 p-2.5 rounded-xl border border-gray-800 focus:outline-none"
-          />
-        </div>
-
-        {/* Min Rating */}
-        <div>
-          <label className="block text-xs font-semibold text-gray-400 mb-1.5">Min Rating</label>
-          <select
-            value={minRating}
-            onChange={(e) => setMinRating(e.target.value)}
-            className="w-full bg-gray-950 text-sm text-gray-200 p-2.5 rounded-xl border border-gray-800 focus:outline-none"
-          >
-            <option value="0">Any Rating</option>
-            <option value="5">5+ ⭐</option>
-            <option value="7">7+ ⭐</option>
-            <option value="8">8+ ⭐</option>
-          </select>
-        </div>
-
-        {/* Sort By */}
-        <div>
-          <label className="block text-xs font-semibold text-gray-400 mb-1.5">Sort By</label>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="w-full bg-gray-950 text-sm text-gray-200 p-2.5 rounded-xl border border-gray-800 focus:outline-none"
-          >
-            <option value="popularity.desc">Most Popular</option>
-            <option value="vote_average.desc">Highest Rated</option>
-            <option value="release_date.desc">Newest Releases</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Results Grid */}
-      {loading ? (
+      {results.results && results.results.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-          {Array.from({ length: 10 }).map((_, i) => (
-            <div key={i} className="aspect-[2/3] bg-gray-900 animate-pulse rounded-2xl border border-gray-800" />
-          ))}
-        </div>
-      ) : results.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-          {results.map((item) => (
+          {results.results.map((item: any) => (
             <MovieCard
-              key={`${mediaType}-${item.id}`}
+              key={`${type}-${item.id}`}
               id={item.id}
-              title={item.title || (item as any).name}
+              title={item.title || item.name}
               posterPath={item.poster_path}
               voteAverage={item.vote_average}
-              releaseDate={item.release_date || (item as any).first_air_date}
-              mediaType={mediaType}
+              releaseDate={item.release_date || item.first_air_date}
+              mediaType={type}
             />
           ))}
         </div>
@@ -173,13 +78,5 @@ function DiscoverContent() {
         </div>
       )}
     </div>
-  );
-}
-
-export default function DiscoverPage() {
-  return (
-    <Suspense fallback={<div className="p-10 text-gray-400">Loading Discover Engine...</div>}>
-      <DiscoverContent />
-    </Suspense>
   );
 }
