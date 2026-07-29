@@ -86,7 +86,7 @@ export default function Navbar({ onOpenCommandPalette }: NavbarProps) {
           <Link href="/trending" className="block py-1.5 hover:text-white">Trending</Link>
           <Link href="/ai-recommendations" className="block py-1.5 text-brand-400">AI Mood Recommender</Link>
           <Link href="/auth" className="block py-1.5 text-brand-400">TMDB Account & OAuth</Link>
-          <Link href="/api-explorer" className="block py-1.5 text-amber-400">400+ API Explorer</Link>
+          <Link href="/api-explorer" className="block py-1.5 text-amber-400">API Explorer</Link>
         </div>
       )}
     </header>

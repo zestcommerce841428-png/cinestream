@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useCallback, useSyncExternalStore } from 'react';
 
 export interface WatchlistItem {
   id: number;
@@ -26,42 +26,75 @@ const WatchlistContext = createContext<WatchlistContextType>({
   isInWatchlist: () => false,
 });
 
-export const WatchlistProvider = ({ children }: { children: React.ReactNode }) => {
-  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+const STORAGE_KEY = 'app_watchlist';
+const UPDATE_EVENT = 'watchlist-updated';
+const EMPTY: WatchlistItem[] = [];
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('app_watchlist');
-      if (saved) {
-        setWatchlist(JSON.parse(saved));
-      }
-    } catch (e) {
-      console.error('Failed to load watchlist', e);
-    }
+// Module-level cache so the useSyncExternalStore snapshot function returns a stable
+// reference (required to avoid re-render loops) instead of re-parsing JSON every call.
+let cachedRaw: string | null | undefined = undefined;
+let cachedSnapshot: WatchlistItem[] = EMPTY;
+
+function readStore(): WatchlistItem[] {
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return EMPTY;
+  }
+  if (raw === cachedRaw) return cachedSnapshot;
+  cachedRaw = raw;
+  try {
+    cachedSnapshot = raw ? JSON.parse(raw) : EMPTY;
+  } catch {
+    cachedSnapshot = EMPTY;
+  }
+  return cachedSnapshot;
+}
+
+function writeStore(next: WatchlistItem[]) {
+  cachedRaw = JSON.stringify(next);
+  cachedSnapshot = next;
+  try {
+    localStorage.setItem(STORAGE_KEY, cachedRaw);
+  } catch (e) {
+    console.error('Failed to save watchlist', e);
+  }
+  // The native "storage" event only fires in *other* tabs, so a same-tab custom event
+  // is needed for this tab's subscribers (e.g. the navbar badge) to pick up the change.
+  window.dispatchEvent(new Event(UPDATE_EVENT));
+}
+
+function subscribe(callback: () => void) {
+  window.addEventListener('storage', callback);
+  window.addEventListener(UPDATE_EVENT, callback);
+  return () => {
+    window.removeEventListener('storage', callback);
+    window.removeEventListener(UPDATE_EVENT, callback);
+  };
+}
+
+function getServerSnapshot() {
+  return EMPTY;
+}
+
+export const WatchlistProvider = ({ children }: { children: React.ReactNode }) => {
+  const watchlist = useSyncExternalStore(subscribe, readStore, getServerSnapshot);
+
+  const addToWatchlist = useCallback((item: WatchlistItem) => {
+    const current = readStore();
+    if (current.some((i) => i.id === item.id && i.type === item.type)) return;
+    writeStore([...current, item]);
   }, []);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('app_watchlist', JSON.stringify(watchlist));
-    } catch (e) {
-      console.error('Failed to save watchlist', e);
-    }
-  }, [watchlist]);
+  const removeFromWatchlist = useCallback((id: number, type: 'movie' | 'tv') => {
+    writeStore(readStore().filter((i) => !(i.id === id && i.type === type)));
+  }, []);
 
-  const addToWatchlist = (item: WatchlistItem) => {
-    setWatchlist((prev) => {
-      if (prev.some((i) => i.id === item.id && i.type === item.type)) return prev;
-      return [...prev, item];
-    });
-  };
-
-  const removeFromWatchlist = (id: number, type: 'movie' | 'tv') => {
-    setWatchlist((prev) => prev.filter((i) => !(i.id === id && i.type === type)));
-  };
-
-  const isInWatchlist = (id: number, type: 'movie' | 'tv') => {
-    return watchlist.some((i) => i.id === id && i.type === type);
-  };
+  const isInWatchlist = useCallback(
+    (id: number, type: 'movie' | 'tv') => watchlist.some((i) => i.id === id && i.type === type),
+    [watchlist]
+  );
 
   return (
     <WatchlistContext.Provider value={{ watchlist, addToWatchlist, removeFromWatchlist, isInWatchlist }}>

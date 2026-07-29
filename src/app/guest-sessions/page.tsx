@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { UserCheck, Key, RefreshCw, Star } from 'lucide-react';
-import { tmdbClient } from '@/services/tmdb';
+import { UserCheck, Key, RefreshCw } from 'lucide-react';
+import { createGuestSessionAction } from '@/lib/actions';
 
 export default function GuestSessionsPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -12,7 +12,7 @@ export default function GuestSessionsPage() {
   const createSession = async () => {
     setLoading(true);
     try {
-      const res = await tmdbClient.createGuestSession();
+      const res = await createGuestSessionAction();
       if (res.success) {
         setSessionId(res.guest_session_id);
         setExpiresAt(res.expires_at);

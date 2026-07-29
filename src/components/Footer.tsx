@@ -16,7 +16,7 @@ export default function Footer() {
             <span className="text-lg font-bold text-white tracking-wide">CineStream</span>
           </div>
           <p className="text-xs text-gray-400 leading-relaxed">
-            Next-generation movie and TV platform powered by Next.js 16.2+ App Router, Tailwind CSS, and TMDB's 500+ endpoints API.
+            Next-generation movie and TV platform powered by Next.js 16.2+ App Router, Tailwind CSS, and TMDB&apos;s API.
           </p>
         </div>
 
@@ -66,7 +66,7 @@ export default function Footer() {
         <div>
           <h4 className="text-white font-semibold text-xs uppercase tracking-wider mb-3">Developer & API</h4>
           <ul className="space-y-2 text-xs">
-            <li><Link href="/api-explorer" className="text-brand-400 font-bold hover:underline">500+ TMDB Endpoints Playground</Link></li>
+            <li><Link href="/api-explorer" className="text-brand-400 font-bold hover:underline">TMDB Endpoints Playground</Link></li>
             <li><a href="https://developer.themoviedb.org" target="_blank" rel="noreferrer" className="hover:text-white transition">TMDB Documentation</a></li>
             <li><a href="https://nextjs.org" target="_blank" rel="noreferrer" className="hover:text-white transition">Next.js 16.2+ App Router</a></li>
             <li><a href="https://tailwindcss.com" target="_blank" rel="noreferrer" className="hover:text-white transition">Tailwind CSS</a></li>

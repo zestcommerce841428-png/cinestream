@@ -1,4 +1,4 @@
-// TMDB API Service supporting 500+ endpoints with full TypeScript definitions & Append-to-Response
+// TMDB API Service supporting 150+ endpoints with full TypeScript definitions & Append-to-Response
 //
 // `TMDB_API_KEY` is intentionally server-only (no `NEXT_PUBLIC_` prefix, no hardcoded
 // fallback). Every `tmdbClient`/`tmdbAuthClient` call in this app runs from Server
@@ -9,6 +9,14 @@
 export const TMDB_API_KEY = process.env.TMDB_API_KEY ?? '';
 export const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 export const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
+
+/**
+ * Client-safe key used ONLY by the API Explorer playground (src/app/api-explorer), which
+ * intentionally runs live requests from the browser so visitors can inspect the raw HTTP
+ * call. Optional — the explorer shows a "bring your own key" notice when this is unset,
+ * rather than the app shipping a real secret in the client bundle.
+ */
+export const TMDB_EXPLORER_KEY = process.env.NEXT_PUBLIC_TMDB_EXPLORER_KEY ?? '';
 
 function assertApiKey(): string {
   if (!TMDB_API_KEY) {
@@ -149,7 +157,7 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
 }
 
 // -------------------------------------------------------------
-// 500+ ENDPOINTS TMDB CLIENT
+// 150+ ENDPOINTS TMDB CLIENT
 // -------------------------------------------------------------
 
 export const tmdbClient = {

@@ -30,7 +30,7 @@ export default function CommandMenu({ isOpen, onClose }: { isOpen: boolean; onCl
     { name: 'Watchlist Analytics & Stats', href: '/watch-analytics', icon: Bookmark },
     { name: 'Plot Keywords & Tropes', href: '/keywords', icon: Sparkles },
     { name: 'Global Watch Providers', href: '/providers', icon: Globe },
-    { name: '175+ TMDB Endpoints Playground', href: '/api-explorer', icon: Terminal },
+    { name: 'TMDB Endpoints Playground', href: '/api-explorer', icon: Terminal },
     { name: 'Watchlist Manager', href: '/watchlist', icon: Bookmark },
   ];
 

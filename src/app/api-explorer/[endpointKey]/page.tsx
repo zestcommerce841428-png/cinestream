@@ -2,8 +2,8 @@
 
 import React, { use, useState } from 'react';
 import Link from 'next/link';
-import { Terminal, Play, Clock, Code, Copy, Check, ArrowLeft, ShieldCheck, Layers } from 'lucide-react';
-import { TMDB_API_KEY, TMDB_BASE_URL } from '@/services/tmdb';
+import { Terminal, Play, Clock, Copy, Check, ArrowLeft, AlertTriangle, Layers } from 'lucide-react';
+import { TMDB_EXPLORER_KEY, TMDB_BASE_URL } from '@/services/tmdb';
 
 export default function DedicatedEndpointPage({ params }: { params: Promise<{ endpointKey: string }> }) {
   const resolvedParams = use(params);
@@ -47,9 +47,11 @@ export default function DedicatedEndpointPage({ params }: { params: Promise<{ en
   const [codeTab, setCodeTab] = useState<'curl' | 'fetch' | 'next' | 'python'>('curl');
   const [copied, setCopied] = useState(false);
 
+  const hasExplorerKey = Boolean(TMDB_EXPLORER_KEY);
+
   const fullUrl = () => {
     const url = new URL(`${TMDB_BASE_URL}${meta.path}`);
-    url.searchParams.append('api_key', TMDB_API_KEY);
+    url.searchParams.append('api_key', TMDB_EXPLORER_KEY || '<your-tmdb-api-key>');
     Object.entries(queryParams).forEach(([k, v]) => {
       if (v) url.searchParams.append(k, v);
     });
@@ -57,6 +59,7 @@ export default function DedicatedEndpointPage({ params }: { params: Promise<{ en
   };
 
   const handleExecute = async () => {
+    if (!hasExplorerKey) return;
     setLoading(true);
     const start = performance.now();
     try {
@@ -95,7 +98,7 @@ export default function DedicatedEndpointPage({ params }: { params: Promise<{ en
       <div className="flex items-center justify-between border-b border-gray-800 pb-6">
         <Link href="/api-explorer" className="inline-flex items-center space-x-2 text-xs font-bold text-gray-400 hover:text-white transition">
           <ArrowLeft className="w-4 h-4" />
-          <span>Return to 500+ API Catalog</span>
+          <span>Return to API Catalog</span>
         </Link>
         <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20 uppercase">
           {meta.category}
@@ -112,6 +115,18 @@ export default function DedicatedEndpointPage({ params }: { params: Promise<{ en
         <div className="p-3 bg-gray-950 rounded-xl border border-gray-800 font-mono text-xs text-gray-400 break-all select-all">
           {fullUrl()}
         </div>
+
+        {!hasExplorerKey && (
+          <div className="flex items-start space-x-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+            <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-200 leading-relaxed">
+              Live requests are disabled — this playground needs its own client-side key. Set{' '}
+              <code className="font-mono bg-gray-950 px-1.5 py-0.5 rounded">NEXT_PUBLIC_TMDB_EXPLORER_KEY</code> in{' '}
+              <code className="font-mono bg-gray-950 px-1.5 py-0.5 rounded">.env.local</code> with a TMDB v3 API key to enable
+              it. You can still copy the generated code snippets and swap in your own key.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Runner Interface */}
@@ -138,11 +153,12 @@ export default function DedicatedEndpointPage({ params }: { params: Promise<{ en
 
             <button
               onClick={handleExecute}
-              disabled={loading}
-              className="w-full inline-flex items-center justify-center space-x-2 px-6 py-3 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-extrabold text-xs shadow-xl disabled:opacity-50 transition"
+              disabled={loading || !hasExplorerKey}
+              title={hasExplorerKey ? undefined : 'Set NEXT_PUBLIC_TMDB_EXPLORER_KEY in .env.local to enable live requests'}
+              className="w-full inline-flex items-center justify-center space-x-2 px-6 py-3 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-extrabold text-xs shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               <Play className="w-4 h-4 fill-white" />
-              <span>{loading ? 'Executing Request...' : 'Execute API Request'}</span>
+              <span>{loading ? 'Executing Request...' : hasExplorerKey ? 'Execute API Request' : 'No Explorer Key Configured'}</span>
             </button>
           </div>
 
@@ -207,7 +223,7 @@ export default function DedicatedEndpointPage({ params }: { params: Promise<{ en
               ) : response ? (
                 <pre className="text-gray-200">{JSON.stringify(response, null, 2)}</pre>
               ) : (
-                <span className="text-gray-500 italic">Click "Execute API Request" above to view live TMDB JSON response.</span>
+                <span className="text-gray-500 italic">Click &ldquo;Execute API Request&rdquo; above to view live TMDB JSON response.</span>
               )}
             </div>
           </div>

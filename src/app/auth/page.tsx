@@ -1,12 +1,26 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Image from 'next/image';
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Key, UserCheck, Star, Heart, Bookmark, List, Shield, LogOut, ExternalLink, Plus, RefreshCw, Film, Tv } from 'lucide-react';
 import Link from 'next/link';
-import { Key, UserCheck, Star, Heart, Bookmark, List, Shield, LogOut, ExternalLink, Plus, Trash2, RefreshCw, Check, Film, Tv } from 'lucide-react';
-import { tmdbAuthClient, TMDBAccount } from '@/services/tmdbAuth';
+import type { TMDBAccount } from '@/services/tmdbAuth';
+import {
+  createRequestTokenAction,
+  createSessionAction,
+  deleteSessionAction,
+  getAccountDataAction,
+  createCustomListAction,
+  clearListAction,
+  deleteListAction,
+} from '@/lib/actions';
 
-export default function AdvancedAuthPage() {
+const SESSION_STORAGE_KEY = 'tmdb_session_id';
+
+function AuthContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [account, setAccount] = useState<TMDBAccount | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,63 +32,95 @@ export default function AdvancedAuthPage() {
   const [lists, setLists] = useState<any[]>([]);
   const [ratedEpisodes, setRatedEpisodes] = useState<any[]>([]);
 
-  // Modal State for New Custom List
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [listName, setListName] = useState('');
   const [listDesc, setListDesc] = useState('');
 
-  // Rating State
-  const [ratingMediaId, setRatingMediaId] = useState<number | null>(null);
-  const [ratingValue, setRatingValue] = useState<number>(8);
+  const logout = useCallback(() => {
+    const current = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (current) {
+      deleteSessionAction(current).catch(() => {});
+    }
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    setSessionId(null);
+    setAccount(null);
+  }, []);
 
+  const fetchAccountData = useCallback(
+    async (session: string) => {
+      setLoading(true);
+      try {
+        const data = await getAccountDataAction(session);
+        if (!data.account) {
+          logout();
+          return;
+        }
+        setAccount(data.account);
+        setFavorites(data.favorites);
+        setRatings(data.ratings);
+        setWatchlist(data.watchlist);
+        setLists(data.lists);
+        setRatedEpisodes(data.ratedEpisodes);
+      } catch (e) {
+        console.error('Failed fetching account details', e);
+        logout();
+      } finally {
+        setLoading(false);
+      }
+    },
+    [logout]
+  );
+
+  // Complete the TMDB v3 OAuth handshake: after the user approves the request token on
+  // themoviedb.org, TMDB redirects back here with ?request_token=...&approved=true. That
+  // token must be exchanged for a session_id via POST /authentication/session/new — the
+  // original implementation redirected out but never completed this step, so login could
+  // never actually succeed.
   useEffect(() => {
-    const savedSession = localStorage.getItem('tmdb_session_id');
+    const requestToken = searchParams.get('request_token');
+    const approved = searchParams.get('approved');
+
+    if (requestToken && approved === 'true') {
+      (async () => {
+        setLoading(true);
+        try {
+          const res = await createSessionAction(requestToken);
+          if (res.success && res.session_id) {
+            localStorage.setItem(SESSION_STORAGE_KEY, res.session_id);
+            setSessionId(res.session_id);
+            await fetchAccountData(res.session_id);
+          }
+        } catch (e) {
+          console.error('Failed to complete TMDB authentication', e);
+        } finally {
+          setLoading(false);
+          router.replace('/auth');
+        }
+      })();
+      return;
+    }
+
+    const savedSession = localStorage.getItem(SESSION_STORAGE_KEY);
     if (savedSession) {
+      // One-time "resume session from localStorage on mount" — a canonical data-fetch
+      // effect (localStorage isn't readable during SSR, so this can't be initial state).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSessionId(savedSession);
       fetchAccountData(savedSession);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const fetchAccountData = async (session: string) => {
-    setLoading(true);
-    try {
-      const acc = await tmdbAuthClient.getAccountDetails(session);
-      setAccount(acc);
-
-      if (acc?.id) {
-        const [favRes, rateRes, watchRes, listRes, epRes] = await Promise.all([
-          tmdbAuthClient.getFavoriteMovies(acc.id, session),
-          tmdbAuthClient.getRatedMovies(acc.id, session),
-          tmdbAuthClient.getAccountWatchlistMovies(acc.id, session),
-          tmdbAuthClient.getAccountLists(acc.id, session),
-          tmdbAuthClient.getRatedEpisodes(acc.id, session)
-        ]);
-
-        setFavorites(favRes.results || []);
-        setRatings(rateRes.results || []);
-        setWatchlist(watchRes.results || []);
-        setLists(listRes.results || []);
-        setRatedEpisodes(epRes.results || []);
-      }
-    } catch (e) {
-      console.error('Failed fetching account details', e);
-      logout();
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleStartOAuth = async () => {
     setLoading(true);
     try {
-      const tokenRes = await tmdbAuthClient.createRequestToken();
+      const tokenRes = await createRequestTokenAction();
       if (tokenRes.success) {
-        const redirectUrl = `https://www.themoviedb.org/authenticate/${tokenRes.request_token}?redirect_to=${encodeURIComponent(window.location.href)}`;
+        const redirectUrl = `https://www.themoviedb.org/authenticate/${tokenRes.request_token}?redirect_to=${encodeURIComponent(window.location.origin + '/auth')}`;
         window.location.href = redirectUrl;
       }
     } catch (e) {
       console.error('Error creating request token', e);
-    } finally {
       setLoading(false);
     }
   };
@@ -83,7 +129,7 @@ export default function AdvancedAuthPage() {
     e.preventDefault();
     if (!sessionId || !listName) return;
     try {
-      await tmdbAuthClient.createCustomList(listName, listDesc, 'en', sessionId);
+      await createCustomListAction(listName, listDesc, sessionId);
       setListName('');
       setListDesc('');
       setShowCreateModal(false);
@@ -96,7 +142,7 @@ export default function AdvancedAuthPage() {
   const handleClearList = async (listId: string) => {
     if (!sessionId) return;
     try {
-      await tmdbAuthClient.clearList(listId, sessionId);
+      await clearListAction(listId, sessionId);
       fetchAccountData(sessionId);
     } catch (err) {
       console.error('Error clearing list', err);
@@ -106,31 +152,11 @@ export default function AdvancedAuthPage() {
   const handleDeleteList = async (listId: string) => {
     if (!sessionId) return;
     try {
-      await tmdbAuthClient.deleteList(listId, sessionId);
+      await deleteListAction(listId, sessionId);
       fetchAccountData(sessionId);
     } catch (err) {
       console.error('Error deleting list', err);
     }
-  };
-
-  const handleSubmitRating = async (movieId: number) => {
-    if (!sessionId) return;
-    try {
-      await tmdbAuthClient.rateMovie(movieId, sessionId, ratingValue);
-      setRatingMediaId(null);
-      fetchAccountData(sessionId);
-    } catch (err) {
-      console.error('Error rating movie', err);
-    }
-  };
-
-  const logout = () => {
-    if (sessionId) {
-      tmdbAuthClient.deleteSession(sessionId).catch(() => {});
-    }
-    localStorage.removeItem('tmdb_session_id');
-    setSessionId(null);
-    setAccount(null);
   };
 
   return (
@@ -139,7 +165,7 @@ export default function AdvancedAuthPage() {
       <div className="border-b border-gray-800 pb-6 space-y-2">
         <div className="flex items-center space-x-2">
           <Key className="w-8 h-8 text-brand-500" />
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">47+ TMDB User Account & OAuth Center</h1>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">TMDB User Account & OAuth Center</h1>
         </div>
         <p className="text-gray-400 text-sm">Synchronize user favorites, rating submissions, custom list creation, watchlist sync, and OAuth session tokens.</p>
       </div>
@@ -148,7 +174,7 @@ export default function AdvancedAuthPage() {
         <div className="bg-gray-900/80 p-10 rounded-3xl border border-gray-800 space-y-6 text-center max-w-xl mx-auto backdrop-blur-xl">
           <Shield className="w-16 h-16 text-brand-500 mx-auto" />
           <div className="space-y-2">
-            <h2 className="text-2xl font-extrabold text-white">Connect TMDB v3 / v4 OAuth</h2>
+            <h2 className="text-2xl font-extrabold text-white">Connect TMDB v3 OAuth</h2>
             <p className="text-xs text-gray-400 leading-relaxed">
               Authorize CineStream to manage user favorites, submit 1-10 ratings, build custom lists, and sync watchlists across all devices.
             </p>
@@ -316,6 +342,30 @@ export default function AdvancedAuthPage() {
                 ))}
               </div>
             )}
+
+            {/* Watchlist Tab */}
+            {activeTab === 'watchlist' && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {watchlist.map((m) => (
+                  <Link key={m.id} href={`/movie/${m.id}`} className="bg-gray-900/80 p-3 rounded-2xl border border-gray-800 space-y-2 hover:border-brand-500/50 transition">
+                    <span className="font-extrabold text-xs text-white line-clamp-1">{m.title}</span>
+                    <span className="text-[11px] text-gray-400 block">⭐ {m.vote_average?.toFixed(1)} / 10</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            {/* Rated Episodes Tab */}
+            {activeTab === 'rated_episodes' && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {ratedEpisodes.map((ep, idx) => (
+                  <div key={idx} className="bg-gray-900/80 p-4 rounded-2xl border border-gray-800 space-y-2">
+                    <span className="font-extrabold text-xs text-white block line-clamp-1">{ep.name}</span>
+                    <div className="text-xs text-amber-400 font-bold">Your Rating: ⭐ {ep.rating} / 10</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -364,5 +414,13 @@ export default function AdvancedAuthPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<div className="p-10 text-gray-400">Loading…</div>}>
+      <AuthContent />
+    </Suspense>
   );
 }
