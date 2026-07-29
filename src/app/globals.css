@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-950 text-gray-100 antialiased selection:bg-brand-500 selection:text-white;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Focus visible accessibility outline ring */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-gray-950;
+  }
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #090d16;
+}
+::-webkit-scrollbar-thumb {
+  background: #1f293d;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #374151;
+}
+
+/* Custom Utilities */
+@layer utilities {
+  .glass-card {
+    @apply bg-gray-900/70 backdrop-blur-md border border-gray-800/80 hover:border-brand-500/40 transition-all duration-300 shadow-xl;
+  }
+  
+  .glass-nav {
+    @apply bg-gray-950/80 backdrop-blur-xl border-b border-gray-800/80;
+  }
+
+  .glow-brand {
+    box-shadow: 0 0 25px -5px rgba(225, 29, 72, 0.3);
+  }
+
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}

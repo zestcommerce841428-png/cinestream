@@ -1,0 +1,87 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { Clock, Film } from 'lucide-react';
+import { tmdbClient, Movie } from '@/services/tmdb';
+import MovieCard from '@/components/MovieCard';
+
+export default function ErasPage() {
+  const [selectedEra, setSelectedEra] = useState('1970');
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const eras = [
+    { start: 1920, end: 1939, label: 'Golden Age Silent & Early Talkies (1920s-30s)' },
+    { start: 1940, end: 1959, label: 'Classic Hollywood & Noir (1940s-50s)' },
+    { start: 1960, end: 1979, label: 'New Hollywood Revolution (1960s-70s)' },
+    { start: 1980, end: 1999, label: '80s Blockbusters & 90s Indies (1980s-90s)' },
+    { start: 2000, end: 2019, label: 'CGI & Franchise Universe Era (2000s-10s)' },
+  ];
+
+  const currentEra = eras.find((e) => e.start.toString() === selectedEra) || eras[2];
+
+  useEffect(() => {
+    async function loadEraMovies() {
+      setLoading(true);
+      try {
+        const res = await tmdbClient.getMoviesByDecade(currentEra.start, currentEra.end);
+        setMovies(res.results || []);
+      } catch (e) {
+        console.error('Failed loading era movies', e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadEraMovies();
+  }, [selectedEra]);
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+      <div className="border-b border-gray-800 pb-6 space-y-4">
+        <div className="flex items-center space-x-2">
+          <Clock className="w-8 h-8 text-brand-500" />
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">Cinematic Eras & Film History Timeline</h1>
+        </div>
+        <p className="text-gray-400 text-sm">Explore milestone eras of global cinema from silent film talkies to modern CGI blockbusters.</p>
+
+        <div className="flex flex-wrap gap-2 pt-2">
+          {eras.map((e) => (
+            <button
+              key={e.start}
+              onClick={() => setSelectedEra(e.start.toString())}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                selectedEra === e.start.toString()
+                  ? 'bg-brand-600 text-white shadow-md'
+                  : 'bg-gray-900 border border-gray-800 text-gray-400 hover:text-white'
+              }`}
+            >
+              {e.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} className="aspect-[2/3] bg-gray-900 animate-pulse rounded-2xl border border-gray-800" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+          {movies.map((m) => (
+            <MovieCard
+              key={m.id}
+              id={m.id}
+              title={m.title}
+              posterPath={m.poster_path}
+              voteAverage={m.vote_average}
+              releaseDate={m.release_date}
+              mediaType="movie"
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
