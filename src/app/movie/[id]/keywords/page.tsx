@@ -1,40 +1,50 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import React from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { Tag, ArrowLeft } from 'lucide-react';
 import { tmdbClient } from '@/services/tmdb';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function MovieKeywordsPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const movieId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [movie, setMovie] = useState<any>(null);
-  const [keywords, setKeywords] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    async function loadKeywords() {
-      if (!movieId) return;
-      setLoading(true);
-      try {
-        const [mRes, kRes] = await Promise.all([
-          tmdbClient.getMovieDetails(movieId),
-          tmdbClient.getMovieKeywords(movieId)
-        ]);
-        setMovie(mRes);
-        setKeywords(kRes.keywords || []);
-      } catch (e) {
-        console.error('Failed loading keywords', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadKeywords();
-  }, [movieId]);
+async function getData(id: number) {
+  try {
+    const [movie, keywordsRes] = await Promise.all([
+      tmdbClient.getMovieDetails(id),
+      tmdbClient.getMovieKeywords(id),
+    ]);
+    return { movie, keywords: keywordsRes.keywords || [] };
+  } catch {
+    return null;
+  }
+}
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading plot keywords...</div>;
-  if (!movie) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">Movie not found</div>;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const data = await getData(parseInt(id, 10));
+  if (!data) return { title: 'Movie Not Found', robots: { index: false, follow: false } };
+  return buildMetadata({
+    title: `Plot Keywords — ${data.movie.title}`,
+    description: `Plot keywords and storytelling motifs tagged for ${data.movie.title}.`,
+    path: `/movie/${id}/keywords`,
+  });
+}
+
+export default async function MovieKeywordsPage({ params }: PageProps) {
+  const { id } = await params;
+  const movieId = parseInt(id, 10);
+  const data = await getData(movieId);
+
+  if (!data) {
+    notFound();
+  }
+
+  const { movie, keywords } = data;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -49,17 +59,21 @@ export default function MovieKeywordsPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        {keywords.map((k) => (
-          <Link
-            key={k.id}
-            href={`/keyword/${k.id}`}
-            className="px-4 py-2 rounded-xl bg-gray-900 border border-gray-800 hover:border-brand-500/50 text-xs font-bold text-gray-300 hover:text-white transition"
-          >
-            #{k.name}
-          </Link>
-        ))}
-      </div>
+      {keywords.length > 0 ? (
+        <div className="flex flex-wrap gap-3">
+          {keywords.map((k: any) => (
+            <Link
+              key={k.id}
+              href={`/keyword/${k.id}`}
+              className="px-4 py-2 rounded-xl bg-gray-900 border border-gray-800 hover:border-brand-500/50 text-xs font-bold text-gray-300 hover:text-white transition"
+            >
+              #{k.name}
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400">No plot keywords available.</p>
+      )}
     </div>
   );
 }

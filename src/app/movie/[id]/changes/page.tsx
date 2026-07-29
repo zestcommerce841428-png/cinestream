@@ -1,40 +1,50 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import React from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { History, ArrowLeft } from 'lucide-react';
 import { tmdbClient } from '@/services/tmdb';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function MovieChangesPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const movieId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [movie, setMovie] = useState<any>(null);
-  const [changes, setChanges] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    async function loadChanges() {
-      if (!movieId) return;
-      setLoading(true);
-      try {
-        const [mRes, cRes] = await Promise.all([
-          tmdbClient.getMovieDetails(movieId),
-          tmdbClient.getMovieChanges(movieId)
-        ]);
-        setMovie(mRes);
-        setChanges(cRes.changes || []);
-      } catch (e) {
-        console.error('Failed loading changes', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadChanges();
-  }, [movieId]);
+async function getData(id: number) {
+  try {
+    const [movie, changesRes] = await Promise.all([
+      tmdbClient.getMovieDetails(id),
+      tmdbClient.getMovieChanges(id),
+    ]);
+    return { movie, changes: changesRes.changes || [] };
+  } catch {
+    return null;
+  }
+}
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading database modification history...</div>;
-  if (!movie) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">Movie not found</div>;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const data = await getData(parseInt(id, 10));
+  if (!data) return { title: 'Movie Not Found', robots: { index: false, follow: false } };
+  return buildMetadata({
+    title: `Revision History — ${data.movie.title}`,
+    description: `Recent database edit history and modified fields for ${data.movie.title}.`,
+    path: `/movie/${id}/changes`,
+  });
+}
+
+export default async function MovieChangesPage({ params }: PageProps) {
+  const { id } = await params;
+  const movieId = parseInt(id, 10);
+  const data = await getData(movieId);
+
+  if (!data) {
+    notFound();
+  }
+
+  const { movie, changes } = data;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -49,14 +59,18 @@ export default function MovieChangesPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
-      <div className="space-y-4">
-        {changes.map((c, idx) => (
-          <div key={idx} className="bg-gray-900/60 p-4 rounded-2xl border border-gray-800 flex items-center justify-between">
-            <span className="font-bold text-xs text-brand-400 uppercase">{c.key}</span>
-            <span className="text-xs text-gray-400">{c.items?.length || 0} Modifications</span>
-          </div>
-        ))}
-      </div>
+      {changes.length > 0 ? (
+        <div className="space-y-4">
+          {changes.map((c: any, idx: number) => (
+            <div key={idx} className="bg-gray-900/60 p-4 rounded-2xl border border-gray-800 flex items-center justify-between">
+              <span className="font-bold text-xs text-brand-400 uppercase">{c.key}</span>
+              <span className="text-xs text-gray-400">{c.items?.length || 0} Modifications</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400">No revision history available.</p>
+      )}
     </div>
   );
 }

@@ -1,40 +1,50 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import React from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import { MessageSquare, ArrowLeft, Star } from 'lucide-react';
+import { notFound } from 'next/navigation';
+import { MessageSquare, ArrowLeft } from 'lucide-react';
 import { tmdbClient, Review } from '@/services/tmdb';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function MovieReviewsPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const movieId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [movie, setMovie] = useState<any>(null);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    async function loadReviews() {
-      if (!movieId) return;
-      setLoading(true);
-      try {
-        const [mRes, rRes] = await Promise.all([
-          tmdbClient.getMovieDetails(movieId),
-          tmdbClient.getMovieReviews(movieId)
-        ]);
-        setMovie(mRes);
-        setReviews(rRes.results || []);
-      } catch (e) {
-        console.error('Failed loading movie reviews', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadReviews();
-  }, [movieId]);
+async function getData(id: number) {
+  try {
+    const [movie, reviewsRes] = await Promise.all([
+      tmdbClient.getMovieDetails(id),
+      tmdbClient.getMovieReviews(id),
+    ]);
+    return { movie, reviews: reviewsRes.results || [] };
+  } catch {
+    return null;
+  }
+}
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading reviews...</div>;
-  if (!movie) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">Movie not found</div>;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const data = await getData(parseInt(id, 10));
+  if (!data) return { title: 'Movie Not Found', robots: { index: false, follow: false } };
+  return buildMetadata({
+    title: `Reviews — ${data.movie.title}`,
+    description: `Critic and community reviews for ${data.movie.title}.`,
+    path: `/movie/${id}/reviews`,
+  });
+}
+
+export default async function MovieReviewsPage({ params }: PageProps) {
+  const { id } = await params;
+  const movieId = parseInt(id, 10);
+  const data = await getData(movieId);
+
+  if (!data) {
+    notFound();
+  }
+
+  const { movie, reviews } = data;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -49,19 +59,23 @@ export default function MovieReviewsPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
-      <div className="space-y-6">
-        {reviews.map((rev) => (
-          <div key={rev.id} className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-sm text-white">{rev.author}</span>
-              {rev.author_details?.rating && (
-                <span className="text-xs font-bold text-amber-400">⭐ {rev.author_details.rating}/10</span>
-              )}
+      {reviews.length > 0 ? (
+        <div className="space-y-6">
+          {reviews.map((rev: Review) => (
+            <div key={rev.id} className="bg-gray-900/80 p-6 rounded-2xl border border-gray-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-sm text-white">{rev.author}</span>
+                {rev.author_details?.rating && (
+                  <span className="text-xs font-bold text-amber-400">⭐ {rev.author_details.rating}/10</span>
+                )}
+              </div>
+              <p className="text-xs text-gray-300 leading-relaxed whitespace-pre-line">{rev.content}</p>
             </div>
-            <p className="text-xs text-gray-300 leading-relaxed whitespace-pre-line">{rev.content}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400">No reviews available.</p>
+      )}
     </div>
   );
 }

@@ -1,33 +1,34 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Layers, Search } from 'lucide-react';
+import { Layers } from 'lucide-react';
 import { tmdbClient, getImageUrl } from '@/services/tmdb';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function CollectionsPage() {
-  const [query, setQuery] = useState('Marvel');
-  const [collections, setCollections] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+export const revalidate = 3600;
 
-  const popularPresets = ['Marvel', 'Star Wars', 'Harry Potter', 'Lord of the Rings', 'Fast & Furious', 'Batman', 'Spider-Man', 'Jurassic Park'];
+const PRESETS = ['Marvel', 'Star Wars', 'Harry Potter', 'Lord of the Rings', 'Fast & Furious', 'Batman', 'Spider-Man', 'Jurassic Park'];
 
-  const searchCollections = async (searchQuery: string) => {
-    setLoading(true);
-    try {
-      const res = await tmdbClient.getPopularCollections(searchQuery);
-      setCollections(res.results || []);
-    } catch (e) {
-      console.error('Failed searching collections', e);
-    } finally {
-      setLoading(false);
-    }
-  };
+interface CollectionsPageProps {
+  searchParams: Promise<{ q?: string }>;
+}
 
-  useEffect(() => {
-    searchCollections(query);
-  }, [query]);
+export async function generateMetadata({ searchParams }: CollectionsPageProps): Promise<Metadata> {
+  const sp = await searchParams;
+  const query = sp.q?.trim() || 'Marvel';
+  return buildMetadata({
+    title: 'Movie Collections & Franchises',
+    description: `Browse the ${query} collection alongside other multi-part movie sagas, universe franchises, and trilogies.`,
+    path: query === 'Marvel' ? '/collections' : `/collections?q=${encodeURIComponent(query)}`,
+  });
+}
+
+export default async function CollectionsPage({ searchParams }: CollectionsPageProps) {
+  const sp = await searchParams;
+  const query = sp.q?.trim() || 'Marvel';
+
+  const res = await tmdbClient.getPopularCollections(query);
+  const collections: Array<{ id: number; name: string; poster_path: string | null }> = res.results || [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -40,27 +41,21 @@ export default function CollectionsPage() {
 
         {/* Preset Chips */}
         <div className="flex flex-wrap gap-2 pt-2">
-          {popularPresets.map((preset) => (
-            <button
+          {PRESETS.map((preset) => (
+            <Link
               key={preset}
-              onClick={() => setQuery(preset)}
+              href={`/collections?q=${encodeURIComponent(preset)}`}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition ${
                 query === preset ? 'bg-brand-600 text-white border-brand-500' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white'
               }`}
             >
               {preset}
-            </button>
+            </Link>
           ))}
         </div>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="aspect-[2/3] bg-gray-900 animate-pulse rounded-2xl border border-gray-800" />
-          ))}
-        </div>
-      ) : collections.length > 0 ? (
+      {collections.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
           {collections.map((col) => (
             <Link
@@ -85,7 +80,7 @@ export default function CollectionsPage() {
         </div>
       ) : (
         <div className="text-center py-20 bg-gray-900/50 rounded-2xl border border-gray-800">
-          <p className="text-gray-400">No collections found for "{query}".</p>
+          <p className="text-gray-400">No collections found for &quot;{query}&quot;.</p>
         </div>
       )}
     </div>

@@ -1,7 +1,12 @@
-'use client';
+import type { Metadata } from 'next';
+import { Monitor } from 'lucide-react';
+import { buildMetadata } from '@/lib/metadata';
 
-import React from 'react';
-import { Film, Monitor } from 'lucide-react';
+export const metadata: Metadata = buildMetadata({
+  title: 'Cinematic Aspect Ratios & Technical Specs Guide',
+  description: 'Reference guide to theatrical aspect ratios and camera frame geometry, from IMAX 70mm native to classic Academy 4:3.',
+  path: '/aspect-ratios',
+});
 
 export default function AspectRatiosPage() {
   const ratios = [

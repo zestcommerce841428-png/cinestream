@@ -1,7 +1,12 @@
-'use client';
-
-import React from 'react';
+import type { Metadata } from 'next';
 import { Disc, Music } from 'lucide-react';
+import { buildMetadata } from '@/lib/metadata';
+
+export const metadata: Metadata = buildMetadata({
+  title: 'Cinematic Sound & Audio Formats Guide',
+  description: 'Reference guide to theatrical spatial audio and home theater sound formats, from Dolby Atmos to DTS:X.',
+  path: '/audio-formats',
+});
 
 export default function AudioFormatsPage() {
   const formats = [

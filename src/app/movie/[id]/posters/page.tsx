@@ -1,41 +1,51 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import React from 'react';
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { Image as ImageIcon, ArrowLeft } from 'lucide-react';
 import { tmdbClient, getImageUrl } from '@/services/tmdb';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function MoviePostersPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const movieId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [movie, setMovie] = useState<any>(null);
-  const [posters, setPosters] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    async function loadPosters() {
-      if (!movieId) return;
-      setLoading(true);
-      try {
-        const [mRes, imgRes] = await Promise.all([
-          tmdbClient.getMovieDetails(movieId),
-          tmdbClient.getMovieImages(movieId)
-        ]);
-        setMovie(mRes);
-        setPosters(imgRes.posters || []);
-      } catch (e) {
-        console.error('Failed loading posters', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadPosters();
-  }, [movieId]);
+async function getData(id: number) {
+  try {
+    const [movie, images] = await Promise.all([
+      tmdbClient.getMovieDetails(id),
+      tmdbClient.getMovieImages(id),
+    ]);
+    return { movie, posters: images.posters || [] };
+  } catch {
+    return null;
+  }
+}
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading posters gallery...</div>;
-  if (!movie) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">Movie not found</div>;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const data = await getData(parseInt(id, 10));
+  if (!data) return { title: 'Movie Not Found', robots: { index: false, follow: false } };
+  return buildMetadata({
+    title: `Posters Gallery — ${data.movie.title}`,
+    description: `Browse official poster artwork in multiple languages and regions for ${data.movie.title}.`,
+    path: `/movie/${id}/posters`,
+  });
+}
+
+export default async function MoviePostersPage({ params }: PageProps) {
+  const { id } = await params;
+  const movieId = parseInt(id, 10);
+  const data = await getData(movieId);
+
+  if (!data) {
+    notFound();
+  }
+
+  const { movie, posters } = data;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -50,13 +60,17 @@ export default function MoviePostersPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-        {posters.map((p, idx) => (
-          <div key={idx} className="aspect-[2/3] relative rounded-2xl overflow-hidden border border-gray-800 bg-gray-950">
-            <Image src={getImageUrl(p.file_path, 'w500')} alt={`${movie.title} Poster`} fill className="object-cover" />
-          </div>
-        ))}
-      </div>
+      {posters.length > 0 ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+          {posters.map((p: any, idx: number) => (
+            <div key={idx} className="aspect-[2/3] relative rounded-2xl overflow-hidden border border-gray-800 bg-gray-950">
+              <Image src={getImageUrl(p.file_path, 'w500')} alt={`${movie.title} Poster`} fill className="object-cover" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400">No posters available.</p>
+      )}
     </div>
   );
 }

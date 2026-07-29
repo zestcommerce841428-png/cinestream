@@ -1,41 +1,51 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import React from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { Sparkles, ArrowLeft } from 'lucide-react';
 import { tmdbClient, Movie } from '@/services/tmdb';
+import { buildMetadata } from '@/lib/metadata';
 import MovieCard from '@/components/MovieCard';
 
-export default function MovieRecommendationsPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const movieId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [movie, setMovie] = useState<any>(null);
-  const [recommendations, setRecommendations] = useState<Movie[]>([]);
-  const [loading, setLoading] = useState(true);
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    async function loadRecommendations() {
-      if (!movieId) return;
-      setLoading(true);
-      try {
-        const [mRes, rRes] = await Promise.all([
-          tmdbClient.getMovieDetails(movieId),
-          tmdbClient.getMovieRecommendations(movieId)
-        ]);
-        setMovie(mRes);
-        setRecommendations(rRes.results || []);
-      } catch (e) {
-        console.error('Failed loading recommendations', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadRecommendations();
-  }, [movieId]);
+async function getData(id: number) {
+  try {
+    const [movie, recommendationsRes] = await Promise.all([
+      tmdbClient.getMovieDetails(id),
+      tmdbClient.getMovieRecommendations(id),
+    ]);
+    return { movie, recommendations: recommendationsRes.results || [] };
+  } catch {
+    return null;
+  }
+}
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading AI recommendations...</div>;
-  if (!movie) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">Movie not found</div>;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const data = await getData(parseInt(id, 10));
+  if (!data) return { title: 'Movie Not Found', robots: { index: false, follow: false } };
+  return buildMetadata({
+    title: `Recommendations — ${data.movie.title}`,
+    description: `Movies recommended by TMDB for fans of ${data.movie.title}.`,
+    path: `/movie/${id}/recommendations`,
+  });
+}
+
+export default async function MovieRecommendationsPage({ params }: PageProps) {
+  const { id } = await params;
+  const movieId = parseInt(id, 10);
+  const data = await getData(movieId);
+
+  if (!data) {
+    notFound();
+  }
+
+  const { movie, recommendations } = data;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -50,19 +60,23 @@ export default function MovieRecommendationsPage({ params }: { params: Promise<{
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-        {recommendations.map((m) => (
-          <MovieCard
-            key={m.id}
-            id={m.id}
-            title={m.title}
-            posterPath={m.poster_path}
-            voteAverage={m.vote_average}
-            releaseDate={m.release_date}
-            mediaType="movie"
-          />
-        ))}
-      </div>
+      {recommendations.length > 0 ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+          {recommendations.map((m: Movie) => (
+            <MovieCard
+              key={m.id}
+              id={m.id}
+              title={m.title}
+              posterPath={m.poster_path}
+              voteAverage={m.vote_average}
+              releaseDate={m.release_date}
+              mediaType="movie"
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400">No recommendations available.</p>
+      )}
     </div>
   );
 }

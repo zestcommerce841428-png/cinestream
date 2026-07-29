@@ -1,28 +1,44 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
-import { Database, RefreshCw, Film, Tv, User } from 'lucide-react';
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { Database } from 'lucide-react';
 import { tmdbClient } from '@/services/tmdb';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function ChangesLogPage() {
-  const [mediaType, setMediaType] = useState<'movie' | 'tv' | 'person'>('movie');
-  const [changes, setChanges] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+export const revalidate = 3600;
 
-  useEffect(() => {
-    async function loadChanges() {
-      setLoading(true);
-      try {
-        const res = await tmdbClient.getMediaChangesFeed(mediaType);
-        setChanges(res.results || []);
-      } catch (e) {
-        console.error('Failed loading database changes', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadChanges();
-  }, [mediaType]);
+const MEDIA_TYPES = [
+  { key: 'movie', label: 'Movies' },
+  { key: 'tv', label: 'TV Series' },
+  { key: 'person', label: 'People' },
+] as const;
+
+type MediaTypeKey = (typeof MEDIA_TYPES)[number]['key'];
+
+function resolveMediaType(raw?: string): MediaTypeKey {
+  return (MEDIA_TYPES.find((m) => m.key === raw)?.key || 'movie') as MediaTypeKey;
+}
+
+interface ChangesPageProps {
+  searchParams: Promise<{ type?: string }>;
+}
+
+export async function generateMetadata({ searchParams }: ChangesPageProps): Promise<Metadata> {
+  const sp = await searchParams;
+  const mediaType = resolveMediaType(sp.type);
+  const label = MEDIA_TYPES.find((m) => m.key === mediaType)!.label;
+  return buildMetadata({
+    title: `${label} Database Changes Log`,
+    description: `Live feed of recently modified TMDB ${label.toLowerCase()} entries — track metadata edits and database updates.`,
+    path: mediaType === 'movie' ? '/changes' : `/changes?type=${mediaType}`,
+  });
+}
+
+export default async function ChangesLogPage({ searchParams }: ChangesPageProps) {
+  const sp = await searchParams;
+  const mediaType = resolveMediaType(sp.type);
+
+  const res = await tmdbClient.getMediaChangesFeed(mediaType);
+  const changes: Array<{ id: number; adult?: boolean }> = res.results || [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -36,46 +52,29 @@ export default function ChangesLogPage() {
         </div>
 
         <div className="flex bg-gray-900 p-1.5 rounded-2xl border border-gray-800 self-start sm:self-auto">
-          <button
-            onClick={() => setMediaType('movie')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold ${mediaType === 'movie' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'}`}
-          >
-            Movies
-          </button>
-          <button
-            onClick={() => setMediaType('tv')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold ${mediaType === 'tv' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'}`}
-          >
-            TV Series
-          </button>
-          <button
-            onClick={() => setMediaType('person')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold ${mediaType === 'person' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'}`}
-          >
-            People
-          </button>
+          {MEDIA_TYPES.map((m) => (
+            <Link
+              key={m.key}
+              href={`/changes?type=${m.key}`}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold ${mediaType === m.key ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              {m.label}
+            </Link>
+          ))}
         </div>
       </div>
 
-      {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-14 bg-gray-900 animate-pulse rounded-xl border border-gray-800" />
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {changes.slice(0, 25).map((item) => (
-            <div key={item.id} className="bg-gray-900/60 px-4 py-3 rounded-xl border border-gray-800/80 flex items-center justify-between font-mono text-xs">
-              <div className="flex items-center space-x-3">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-white font-bold">{mediaType.toUpperCase()} #{item.id}</span>
-              </div>
-              <span className="text-gray-400 text-[11px]">Adult Flag: {item.adult ? 'True' : 'False'}</span>
+      <div className="space-y-2">
+        {changes.slice(0, 25).map((item) => (
+          <div key={item.id} className="bg-gray-900/60 px-4 py-3 rounded-xl border border-gray-800/80 flex items-center justify-between font-mono text-xs">
+            <div className="flex items-center space-x-3">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-white font-bold">{mediaType.toUpperCase()} #{item.id}</span>
             </div>
-          ))}
-        </div>
-      )}
+            <span className="text-gray-400 text-[11px]">Adult Flag: {item.adult ? 'True' : 'False'}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

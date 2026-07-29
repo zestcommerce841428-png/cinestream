@@ -1,40 +1,46 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { Play, ArrowLeft } from 'lucide-react';
 import { tmdbClient, Video } from '@/services/tmdb';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function TVVideosPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const tvId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [tv, setTv] = useState<any>(null);
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [loading, setLoading] = useState(true);
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    async function loadTVVideos() {
-      if (!tvId) return;
-      setLoading(true);
-      try {
-        const [tRes, vRes] = await Promise.all([
-          tmdbClient.getTVDetails(tvId),
-          tmdbClient.getTVVideos(tvId)
-        ]);
-        setTv(tRes);
-        setVideos(vRes.results || []);
-      } catch (e) {
-        console.error('Failed loading TV videos', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadTVVideos();
-  }, [tvId]);
+async function getData(id: number) {
+  try {
+    const [tv, videos] = await Promise.all([tmdbClient.getTVDetails(id), tmdbClient.getTVVideos(id)]);
+    return { tv, videos: videos.results || [] };
+  } catch {
+    return null;
+  }
+}
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading videos...</div>;
-  if (!tv) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">TV Show not found</div>;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const data = await getData(parseInt(id, 10));
+  if (!data) return { title: 'TV Show Not Found', robots: { index: false, follow: false } };
+  return buildMetadata({
+    title: `Videos — ${data.tv.name}`,
+    description: `Trailers, teasers, and featurettes for ${data.tv.name}.`,
+    path: `/tv/${id}/videos`,
+  });
+}
+
+export default async function TVVideosPage({ params }: PageProps) {
+  const { id } = await params;
+  const tvId = parseInt(id, 10);
+  const data = await getData(tvId);
+
+  if (!data) {
+    notFound();
+  }
+
+  const { tv, videos } = data as { tv: any; videos: Video[] };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -49,24 +55,28 @@ export default function TVVideosPage({ params }: { params: Promise<{ id: string 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {videos.map((vid) => (
-          <div key={vid.id} className="bg-gray-900/80 rounded-2xl overflow-hidden border border-gray-800 space-y-3 p-4">
-            <div className="aspect-video relative rounded-xl overflow-hidden bg-black">
-              <iframe
-                src={`https://www.youtube.com/embed/${vid.key}`}
-                title={vid.name}
-                allowFullScreen
-                className="w-full h-full border-0"
-              />
+      {videos.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {videos.map((vid) => (
+            <div key={vid.id} className="bg-gray-900/80 rounded-2xl overflow-hidden border border-gray-800 space-y-3 p-4">
+              <div className="aspect-video relative rounded-xl overflow-hidden bg-black">
+                <iframe
+                  src={`https://www.youtube.com/embed/${vid.key}`}
+                  title={vid.name}
+                  allowFullScreen
+                  className="w-full h-full border-0"
+                />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-brand-400">{vid.type}</span>
+                <h3 className="font-bold text-sm text-white">{vid.name}</h3>
+              </div>
             </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-brand-400">{vid.type}</span>
-              <h3 className="font-bold text-sm text-white">{vid.name}</h3>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400">No videos available.</p>
+      )}
     </div>
   );
 }

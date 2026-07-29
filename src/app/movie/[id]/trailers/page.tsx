@@ -1,40 +1,50 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import React from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Play, ArrowLeft, Film } from 'lucide-react';
+import { notFound } from 'next/navigation';
+import { Play, ArrowLeft } from 'lucide-react';
 import { tmdbClient, Video } from '@/services/tmdb';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function MovieTrailersPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const movieId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [movie, setMovie] = useState<any>(null);
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [loading, setLoading] = useState(true);
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    async function loadTrailers() {
-      if (!movieId) return;
-      setLoading(true);
-      try {
-        const [mRes, vRes] = await Promise.all([
-          tmdbClient.getMovieDetails(movieId),
-          tmdbClient.getMovieVideos(movieId)
-        ]);
-        setMovie(mRes);
-        setVideos(vRes.results || []);
-      } catch (e) {
-        console.error('Failed loading movie trailers', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadTrailers();
-  }, [movieId]);
+async function getData(id: number) {
+  try {
+    const [movie, videosRes] = await Promise.all([
+      tmdbClient.getMovieDetails(id),
+      tmdbClient.getMovieVideos(id),
+    ]);
+    return { movie, videos: videosRes.results || [] };
+  } catch {
+    return null;
+  }
+}
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading trailers & videos...</div>;
-  if (!movie) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">Movie not found</div>;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const data = await getData(parseInt(id, 10));
+  if (!data) return { title: 'Movie Not Found', robots: { index: false, follow: false } };
+  return buildMetadata({
+    title: `Trailers & Videos — ${data.movie.title}`,
+    description: `Watch trailers, teasers, and featurettes for ${data.movie.title}.`,
+    path: `/movie/${id}/trailers`,
+  });
+}
+
+export default async function MovieTrailersPage({ params }: PageProps) {
+  const { id } = await params;
+  const movieId = parseInt(id, 10);
+  const data = await getData(movieId);
+
+  if (!data) {
+    notFound();
+  }
+
+  const { movie, videos } = data;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -49,24 +59,28 @@ export default function MovieTrailersPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {videos.map((vid) => (
-          <div key={vid.id} className="bg-gray-900/80 rounded-2xl overflow-hidden border border-gray-800 space-y-3 p-4">
-            <div className="aspect-video relative rounded-xl overflow-hidden bg-black">
-              <iframe
-                src={`https://www.youtube.com/embed/${vid.key}`}
-                title={vid.name}
-                allowFullScreen
-                className="w-full h-full border-0"
-              />
+      {videos.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {videos.map((vid: Video) => (
+            <div key={vid.id} className="bg-gray-900/80 rounded-2xl overflow-hidden border border-gray-800 space-y-3 p-4">
+              <div className="aspect-video relative rounded-xl overflow-hidden bg-black">
+                <iframe
+                  src={`https://www.youtube.com/embed/${vid.key}`}
+                  title={vid.name}
+                  allowFullScreen
+                  className="w-full h-full border-0"
+                />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-brand-400">{vid.type}</span>
+                <h3 className="font-bold text-sm text-white">{vid.name}</h3>
+              </div>
             </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-brand-400">{vid.type}</span>
-              <h3 className="font-bold text-sm text-white">{vid.name}</h3>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400">No trailers or videos available.</p>
+      )}
     </div>
   );
 }

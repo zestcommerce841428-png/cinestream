@@ -1,8 +1,13 @@
-'use client';
-
-import React from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import { User, Film, Star } from 'lucide-react';
+import { User } from 'lucide-react';
+import { buildMetadata } from '@/lib/metadata';
+
+export const metadata: Metadata = buildMetadata({
+  title: 'Director & Actor Collaborations Network',
+  description: 'Catalog of iconic filmmaker and actor duos — recurring director-actor partnerships that shaped cinema history.',
+  path: '/collaborations',
+});
 
 export default function CollaborationsPage() {
   const duos = [

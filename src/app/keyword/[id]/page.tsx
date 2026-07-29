@@ -1,39 +1,51 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import { Tag, Film } from 'lucide-react';
 import { tmdbClient, Movie } from '@/services/tmdb';
 import MovieCard from '@/components/MovieCard';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function KeywordPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const keywordId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [keyword, setKeyword] = useState<any>(null);
-  const [movies, setMovies] = useState<Movie[]>([]);
-  const [loading, setLoading] = useState(true);
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    async function loadKeyword() {
-      if (!keywordId) return;
-      setLoading(true);
-      try {
-        const [detailsRes, moviesRes] = await Promise.all([
-          tmdbClient.getKeywordDetails(keywordId),
-          tmdbClient.getKeywordMovies(keywordId).catch(() => ({ results: [] }))
-        ]);
-        setKeyword(detailsRes);
-        setMovies(moviesRes.results || []);
-      } catch (e) {
-        console.error('Error loading keyword', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadKeyword();
-  }, [keywordId]);
+async function getKeyword(id: number) {
+  try {
+    const [keyword, moviesRes] = await Promise.all([
+      tmdbClient.getKeywordDetails(id),
+      tmdbClient.getKeywordMovies(id).catch(() => ({ results: [] })),
+    ]);
+    return { keyword, movies: (moviesRes.results || []) as Movie[] };
+  } catch {
+    return null;
+  }
+}
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading keyword tagged items...</div>;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const data = await getKeyword(parseInt(id, 10));
+  if (!data) {
+    return { title: 'Keyword Not Found', robots: { index: false, follow: false } };
+  }
+  return buildMetadata({
+    title: `"${data.keyword.name}" Keyword`,
+    description: `Browse movies tagged with the keyword "${data.keyword.name}" on CineStream.`,
+    path: `/keyword/${data.keyword.id}`,
+  });
+}
+
+export default async function KeywordPage({ params }: PageProps) {
+  const { id } = await params;
+  const keywordId = parseInt(id, 10);
+  const data = await getKeyword(keywordId);
+
+  if (!data) {
+    notFound();
+  }
+
+  const { keyword, movies } = data;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -43,7 +55,7 @@ export default function KeywordPage({ params }: { params: Promise<{ id: string }
         </div>
         <div>
           <span className="text-xs font-semibold text-brand-400 uppercase tracking-wider">Keyword Tag</span>
-          <h1 className="text-3xl font-extrabold text-white capitalize">{keyword?.name || `Keyword #${keywordId}`}</h1>
+          <h1 className="text-3xl font-extrabold text-white capitalize">{keyword.name}</h1>
         </div>
       </div>
 

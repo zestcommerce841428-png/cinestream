@@ -1,44 +1,53 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import type { Metadata } from 'next';
 import Image from 'next/image';
-import { Tv, Globe, MapPin } from 'lucide-react';
+import { notFound } from 'next/navigation';
+import { Tv, Globe } from 'lucide-react';
 import { tmdbClient, getImageUrl, TVShow } from '@/services/tmdb';
 import MovieCard from '@/components/MovieCard';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function NetworkPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const networkId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [network, setNetwork] = useState<any>(null);
-  const [shows, setShows] = useState<TVShow[]>([]);
-  const [loading, setLoading] = useState(true);
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    async function loadNetwork() {
-      if (!networkId) return;
-      setLoading(true);
-      try {
-        const [detailsRes, showsRes] = await Promise.all([
-          tmdbClient.getNetworkDetails(networkId),
-          tmdbClient.getNetworkTVShows(networkId).catch(() => ({ results: [] }))
-        ]);
-        setNetwork(detailsRes);
-        setShows(showsRes.results || []);
-      } catch (e) {
-        console.error('Error loading network', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadNetwork();
-  }, [networkId]);
-
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading network details...</div>;
-
-  if (!network) {
-    return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">Network not found</div>;
+async function getNetwork(id: number) {
+  try {
+    const [network, showsRes] = await Promise.all([
+      tmdbClient.getNetworkDetails(id),
+      tmdbClient.getNetworkTVShows(id).catch(() => ({ results: [] })),
+    ]);
+    return { network, shows: (showsRes.results || []) as TVShow[] };
+  } catch {
+    return null;
   }
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const data = await getNetwork(parseInt(id, 10));
+  if (!data) {
+    return { title: 'Network Not Found', robots: { index: false, follow: false } };
+  }
+  return buildMetadata({
+    title: data.network.name,
+    description: `${data.network.name} — broadcast network profile and full list of series on CineStream.`,
+    path: `/network/${data.network.id}`,
+    image: data.network.logo_path ? getImageUrl(data.network.logo_path, 'w300') : null,
+  });
+}
+
+export default async function NetworkPage({ params }: PageProps) {
+  const { id } = await params;
+  const networkId = parseInt(id, 10);
+  const data = await getNetwork(networkId);
+
+  if (!data) {
+    notFound();
+  }
+
+  const { network, shows } = data;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">

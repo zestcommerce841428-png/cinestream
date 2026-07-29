@@ -1,8 +1,13 @@
-'use client';
-
-import React from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import { User, Film, Star } from 'lucide-react';
+import { User } from 'lucide-react';
+import { buildMetadata } from '@/lib/metadata';
+
+export const metadata: Metadata = buildMetadata({
+  title: 'Directors & Auteurs Filmmaking Matrix',
+  description: "Explore the signature directorial styles and visual motifs of cinema's most influential auteur filmmakers.",
+  path: '/auteurs',
+});
 
 export default function AuteursPage() {
   const auteursList = [

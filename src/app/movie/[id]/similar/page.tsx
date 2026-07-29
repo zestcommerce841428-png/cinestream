@@ -1,41 +1,51 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import React from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { Film, ArrowLeft } from 'lucide-react';
 import { tmdbClient, Movie } from '@/services/tmdb';
+import { buildMetadata } from '@/lib/metadata';
 import MovieCard from '@/components/MovieCard';
 
-export default function MovieSimilarPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const movieId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [movie, setMovie] = useState<any>(null);
-  const [similar, setSimilar] = useState<Movie[]>([]);
-  const [loading, setLoading] = useState(true);
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    async function loadSimilar() {
-      if (!movieId) return;
-      setLoading(true);
-      try {
-        const [mRes, sRes] = await Promise.all([
-          tmdbClient.getMovieDetails(movieId),
-          tmdbClient.getMovieSimilar(movieId)
-        ]);
-        setMovie(mRes);
-        setSimilar(sRes.results || []);
-      } catch (e) {
-        console.error('Failed loading similar movies', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadSimilar();
-  }, [movieId]);
+async function getData(id: number) {
+  try {
+    const [movie, similarRes] = await Promise.all([
+      tmdbClient.getMovieDetails(id),
+      tmdbClient.getMovieSimilar(id),
+    ]);
+    return { movie, similar: similarRes.results || [] };
+  } catch {
+    return null;
+  }
+}
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading similar movies...</div>;
-  if (!movie) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">Movie not found</div>;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const data = await getData(parseInt(id, 10));
+  if (!data) return { title: 'Movie Not Found', robots: { index: false, follow: false } };
+  return buildMetadata({
+    title: `Similar Movies — ${data.movie.title}`,
+    description: `Movies similar in genre and style to ${data.movie.title}.`,
+    path: `/movie/${id}/similar`,
+  });
+}
+
+export default async function MovieSimilarPage({ params }: PageProps) {
+  const { id } = await params;
+  const movieId = parseInt(id, 10);
+  const data = await getData(movieId);
+
+  if (!data) {
+    notFound();
+  }
+
+  const { movie, similar } = data;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -50,19 +60,23 @@ export default function MovieSimilarPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-        {similar.map((m) => (
-          <MovieCard
-            key={m.id}
-            id={m.id}
-            title={m.title}
-            posterPath={m.poster_path}
-            voteAverage={m.vote_average}
-            releaseDate={m.release_date}
-            mediaType="movie"
-          />
-        ))}
-      </div>
+      {similar.length > 0 ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+          {similar.map((m: Movie) => (
+            <MovieCard
+              key={m.id}
+              id={m.id}
+              title={m.title}
+              posterPath={m.poster_path}
+              voteAverage={m.vote_average}
+              releaseDate={m.release_date}
+              mediaType="movie"
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400">No similar movies available.</p>
+      )}
     </div>
   );
 }

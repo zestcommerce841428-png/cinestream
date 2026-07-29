@@ -1,41 +1,51 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import React from 'react';
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { Image as ImageIcon, ArrowLeft } from 'lucide-react';
 import { tmdbClient, getBackdropUrl } from '@/services/tmdb';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function MovieBackdropsPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const movieId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [movie, setMovie] = useState<any>(null);
-  const [backdrops, setBackdrops] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    async function loadBackdrops() {
-      if (!movieId) return;
-      setLoading(true);
-      try {
-        const [mRes, imgRes] = await Promise.all([
-          tmdbClient.getMovieDetails(movieId),
-          tmdbClient.getMovieImages(movieId)
-        ]);
-        setMovie(mRes);
-        setBackdrops(imgRes.backdrops || []);
-      } catch (e) {
-        console.error('Failed loading backdrops', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadBackdrops();
-  }, [movieId]);
+async function getData(id: number) {
+  try {
+    const [movie, images] = await Promise.all([
+      tmdbClient.getMovieDetails(id),
+      tmdbClient.getMovieImages(id),
+    ]);
+    return { movie, backdrops: images.backdrops || [] };
+  } catch {
+    return null;
+  }
+}
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading 4K backdrops...</div>;
-  if (!movie) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">Movie not found</div>;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const data = await getData(parseInt(id, 10));
+  if (!data) return { title: 'Movie Not Found', robots: { index: false, follow: false } };
+  return buildMetadata({
+    title: `4K Backdrops — ${data.movie.title}`,
+    description: `Browse high-resolution backdrop images and stills from ${data.movie.title}.`,
+    path: `/movie/${id}/backdrops`,
+  });
+}
+
+export default async function MovieBackdropsPage({ params }: PageProps) {
+  const { id } = await params;
+  const movieId = parseInt(id, 10);
+  const data = await getData(movieId);
+
+  if (!data) {
+    notFound();
+  }
+
+  const { movie, backdrops } = data;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -50,13 +60,17 @@ export default function MovieBackdropsPage({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-        {backdrops.map((b, idx) => (
-          <div key={idx} className="aspect-video relative rounded-2xl overflow-hidden border border-gray-800 bg-gray-950">
-            <Image src={getBackdropUrl(b.file_path, 'w780')} alt={`${movie.title} Backdrop`} fill className="object-cover" />
-          </div>
-        ))}
-      </div>
+      {backdrops.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          {backdrops.map((b: any, idx: number) => (
+            <div key={idx} className="aspect-video relative rounded-2xl overflow-hidden border border-gray-800 bg-gray-950">
+              <Image src={getBackdropUrl(b.file_path, 'w780')} alt={`${movie.title} Backdrop`} fill className="object-cover" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400">No backdrops available.</p>
+      )}
     </div>
   );
 }

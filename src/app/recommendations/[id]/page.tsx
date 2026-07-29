@@ -1,46 +1,69 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import React from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Film, ArrowLeft, Sparkles } from 'lucide-react';
-import { tmdbClient, Movie } from '@/services/tmdb';
+import { notFound } from 'next/navigation';
+import { ArrowLeft, Sparkles } from 'lucide-react';
+import { tmdbClient, Movie, getImageUrl, getBackdropUrl } from '@/services/tmdb';
 import MovieCard from '@/components/MovieCard';
+import { buildMetadata, truncateDescription } from '@/lib/metadata';
 
-export default function RecommendationsPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const movieId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [movie, setMovie] = useState<any>(null);
-  const [recommendations, setRecommendations] = useState<Movie[]>([]);
-  const [similar, setSimilar] = useState<Movie[]>([]);
-  const [activeTab, setActiveTab] = useState<'recommendations' | 'similar'>('recommendations');
-  const [loading, setLoading] = useState(true);
+const TABS = ['recommendations', 'similar'] as const;
+type Tab = (typeof TABS)[number];
 
-  useEffect(() => {
-    async function loadData() {
-      if (!movieId) return;
-      setLoading(true);
-      try {
-        const [detailsRes, recsRes, similarRes] = await Promise.all([
-          tmdbClient.getMovieDetails(movieId),
-          tmdbClient.getMovieRecommendations(movieId),
-          tmdbClient.getMovieSimilar(movieId)
-        ]);
-        setMovie(detailsRes);
-        setRecommendations(recsRes.results || []);
-        setSimilar(similarRes.results || []);
-      } catch (e) {
-        console.error('Error fetching recommendations', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadData();
-  }, [movieId]);
+interface PageProps {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
+}
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading recommendations engine...</div>;
-  if (!movie) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">Movie not found</div>;
+async function getData(id: number) {
+  try {
+    const [movie, recsRes, similarRes] = await Promise.all([
+      tmdbClient.getMovieDetails(id),
+      tmdbClient.getMovieRecommendations(id),
+      tmdbClient.getMovieSimilar(id),
+    ]);
+    return {
+      movie,
+      recommendations: (recsRes.results || []) as Movie[],
+      similar: (similarRes.results || []) as Movie[],
+    };
+  } catch {
+    return null;
+  }
+}
 
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const data = await getData(parseInt(id, 10));
+  if (!data) {
+    return { title: 'Movie Not Found', robots: { index: false, follow: false } };
+  }
+
+  const { movie, recommendations, similar } = data;
+  return buildMetadata({
+    title: `Recommendations & Similar Movies — ${movie.title}`,
+    description: truncateDescription(
+      `${recommendations.length} AI-curated recommendations and ${similar.length} similar movies for ${movie.title}, based on plot themes, genres, and audience preferences.`
+    ),
+    path: `/recommendations/${movie.id}`,
+    image: movie.poster_path ? getImageUrl(movie.poster_path, 'w780') : movie.backdrop_path ? getBackdropUrl(movie.backdrop_path, 'w1280') : null,
+  });
+}
+
+export default async function RecommendationsPage({ params, searchParams }: PageProps) {
+  const { id } = await params;
+  const movieId = parseInt(id, 10);
+  const data = await getData(movieId);
+
+  if (!data) {
+    notFound();
+  }
+
+  const { movie, recommendations, similar } = data;
+  const sp = await searchParams;
+  const activeTab: Tab = sp.tab === 'similar' ? 'similar' : 'recommendations';
   const currentList = activeTab === 'recommendations' ? recommendations : similar;
 
   return (
@@ -55,24 +78,24 @@ export default function RecommendationsPage({ params }: { params: Promise<{ id: 
           <div>
             <div className="flex items-center space-x-2">
               <Sparkles className="w-8 h-8 text-brand-500" />
-              <h1 className="text-3xl font-extrabold text-white tracking-tight">AI & Similarity Recommendations for "{movie.title}"</h1>
+              <h1 className="text-3xl font-extrabold text-white tracking-tight">AI & Similarity Recommendations for &ldquo;{movie.title}&rdquo;</h1>
             </div>
             <p className="text-gray-400 text-sm mt-1">Discover titles recommended based on plot themes, genres, and audience preferences.</p>
           </div>
 
           <div className="flex bg-gray-900 p-1.5 rounded-2xl border border-gray-800 self-start sm:self-auto">
-            <button
-              onClick={() => setActiveTab('recommendations')}
+            <Link
+              href={`/recommendations/${movieId}?tab=recommendations`}
               className={`px-4 py-2 rounded-xl text-xs font-semibold ${activeTab === 'recommendations' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'}`}
             >
               Recommendations ({recommendations.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('similar')}
+            </Link>
+            <Link
+              href={`/recommendations/${movieId}?tab=similar`}
               className={`px-4 py-2 rounded-xl text-xs font-semibold ${activeTab === 'similar' ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-white'}`}
             >
               Similar Movies ({similar.length})
-            </button>
+            </Link>
           </div>
         </div>
       </div>

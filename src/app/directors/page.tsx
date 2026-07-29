@@ -1,21 +1,26 @@
-'use client';
-
-import React from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import { User, Film, Star } from 'lucide-react';
+import { User } from 'lucide-react';
+import { buildMetadata } from '@/lib/metadata';
+
+export const metadata: Metadata = buildMetadata({
+  title: 'Master Film Directors & Auteurs',
+  description: 'Browse filmographies of visionary directors and auteur filmmakers, including Christopher Nolan, Tarantino, and Miyazaki.',
+  path: '/directors',
+});
+
+const directorsList = [
+  { id: 525, name: 'Christopher Nolan', works: 'Oppenheimer, Interstellar, Inception, The Dark Knight Trilogy' },
+  { id: 138, name: 'Quentin Tarantino', works: 'Pulp Fiction, Django Unchained, Inglorious Basterds, Kill Bill' },
+  { id: 1032, name: 'Martin Scorsese', works: 'Goodfellas, Taxi Driver, The Wolf of Wall Street, The Departed' },
+  { id: 488, name: 'Steven Spielberg', works: 'Jurassic Park, Schindler\'s List, Saving Private Ryan, Jaws' },
+  { id: 608, name: 'Hayao Miyazaki', works: 'Spirited Away, Princess Mononoke, Howl\'s Moving Castle' },
+  { id: 137427, name: 'Denis Villeneuve', works: 'Dune, Blade Runner 2049, Arrival, Sicario' },
+  { id: 2710, name: 'James Cameron', works: 'Avatar, Titanic, Aliens, Terminator 2: Judgment Day' },
+  { id: 578, name: 'Ridley Scott', works: 'Gladiator, Alien, Blade Runner, The Martian' },
+];
 
 export default function DirectorsPage() {
-  const directorsList = [
-    { id: 525, name: 'Christopher Nolan', works: 'Oppenheimer, Interstellar, Inception, The Dark Knight Trilogy' },
-    { id: 138, name: 'Quentin Tarantino', works: 'Pulp Fiction, Django Unchained, Inglorious Basterds, Kill Bill' },
-    { id: 1032, name: 'Martin Scorsese', works: 'Goodfellas, Taxi Driver, The Wolf of Wall Street, The Departed' },
-    { id: 488, name: 'Steven Spielberg', works: 'Jurassic Park, Schindler\'s List, Saving Private Ryan, Jaws' },
-    { id: 608, name: 'Hayao Miyazaki', works: 'Spirited Away, Princess Mononoke, Howl\'s Moving Castle' },
-    { id: 137427, name: 'Denis Villeneuve', works: 'Dune, Blade Runner 2049, Arrival, Sicario' },
-    { id: 2710, name: 'James Cameron', works: 'Avatar, Titanic, Aliens, Terminator 2: Judgment Day' },
-    { id: 578, name: 'Ridley Scott', works: 'Gladiator, Alien, Blade Runner, The Martian' },
-  ];
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       <div className="border-b border-gray-800 pb-6">

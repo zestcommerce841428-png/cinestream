@@ -1,43 +1,66 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
-import Image from 'next/image';
+import React from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import { User, Award, Star, ArrowLeft } from 'lucide-react';
+import { notFound } from 'next/navigation';
+import { Award, ArrowLeft } from 'lucide-react';
 import { tmdbClient, getImageUrl } from '@/services/tmdb';
+import { buildMetadata, truncateDescription } from '@/lib/metadata';
 
-export default function PersonAnalyticsPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const personId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [person, setPerson] = useState<any>(null);
-  const [credits, setCredits] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    async function loadAnalytics() {
-      if (!personId) return;
-      setLoading(true);
-      try {
-        const [detailsRes, creditsRes] = await Promise.all([
-          tmdbClient.getPersonDetails(personId),
-          tmdbClient.getPersonCombinedCredits(personId)
-        ]);
-        setPerson(detailsRes);
-        setCredits(creditsRes.cast || creditsRes.crew || []);
-      } catch (e) {
-        console.error('Failed loading person analytics', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadAnalytics();
-  }, [personId]);
+async function getData(id: number) {
+  try {
+    const [person, creditsRes] = await Promise.all([
+      tmdbClient.getPersonDetails(id),
+      tmdbClient.getPersonCombinedCredits(id),
+    ]);
+    const credits: any[] = creditsRes.cast || creditsRes.crew || [];
+    return { person, credits };
+  } catch {
+    return null;
+  }
+}
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading person analytics...</div>;
-  if (!person) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">Person not found</div>;
+function computeAvgRating(credits: any[]): number {
+  return credits.reduce((acc, c) => acc + (c.vote_average || 0), 0) / (credits.length || 1);
+}
 
-  const avgRating = credits.reduce((acc, c) => acc + (c.vote_average || 0), 0) / (credits.length || 1);
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const data = await getData(parseInt(id, 10));
+  if (!data) {
+    return { title: 'Person Not Found', robots: { index: false, follow: false } };
+  }
+
+  const { person, credits } = data;
+  const avgRating = computeAvgRating(credits);
+
+  return buildMetadata({
+    title: `Career Analytics — ${person.name}`,
+    description: truncateDescription(
+      `Career analytics for ${person.name}: ${credits.length} total credits, ${avgRating.toFixed(1)} average film rating, and a popularity index of ${person.popularity?.toFixed(0) || 0} computed from TMDB combined credits.`
+    ),
+    path: `/person-analytics/${person.id}`,
+    image: person.profile_path ? getImageUrl(person.profile_path, 'w780') : null,
+    type: 'profile',
+  });
+}
+
+export default async function PersonAnalyticsPage({ params }: PageProps) {
+  const { id } = await params;
+  const personId = parseInt(id, 10);
+  const data = await getData(personId);
+
+  if (!data) {
+    notFound();
+  }
+
+  const { person, credits } = data;
+  const avgRating = computeAvgRating(credits);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">

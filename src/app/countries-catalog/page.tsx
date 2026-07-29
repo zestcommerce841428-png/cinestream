@@ -1,27 +1,18 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
-import { Globe, MapPin } from 'lucide-react';
+import type { Metadata } from 'next';
+import { Globe } from 'lucide-react';
 import { tmdbClient } from '@/services/tmdb';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function CountriesCatalogPage() {
-  const [countries, setCountries] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+export const revalidate = 3600;
 
-  useEffect(() => {
-    async function loadCountries() {
-      setLoading(true);
-      try {
-        const res = await tmdbClient.getCountries();
-        setCountries(res || []);
-      } catch (e) {
-        console.error('Failed loading countries catalog', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadCountries();
-  }, []);
+export const metadata: Metadata = buildMetadata({
+  title: 'Worldwide Film Production Countries Catalog',
+  description: 'Browse the full ISO-3166 registry of every film and TV production country and territory tracked by TMDB.',
+  path: '/countries-catalog',
+});
+
+export default async function CountriesCatalogPage() {
+  const countries = (await tmdbClient.getCountries()) || [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -33,18 +24,14 @@ export default function CountriesCatalogPage() {
         <p className="text-gray-400 text-sm mt-1">Full ISO-3166 territory codes and country production registry.</p>
       </div>
 
-      {loading ? (
-        <div className="text-gray-400">Loading countries catalog...</div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {countries.map((c, idx) => (
-            <div key={idx} className="bg-gray-900/60 p-3.5 rounded-xl border border-gray-800 flex items-center justify-between">
-              <span className="font-bold text-xs text-white truncate max-w-[120px]">{c.english_name}</span>
-              <span className="text-[10px] font-mono uppercase bg-gray-950 px-2 py-0.5 rounded text-brand-400 border border-gray-800">{c.iso_3166_1}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        {countries.map((c: any, idx: number) => (
+          <div key={idx} className="bg-gray-900/60 p-3.5 rounded-xl border border-gray-800 flex items-center justify-between">
+            <span className="font-bold text-xs text-white truncate max-w-[120px]">{c.english_name}</span>
+            <span className="text-[10px] font-mono uppercase bg-gray-950 px-2 py-0.5 rounded text-brand-400 border border-gray-800">{c.iso_3166_1}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

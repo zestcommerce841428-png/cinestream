@@ -1,40 +1,51 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import React from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { Tv, ArrowLeft } from 'lucide-react';
 import { tmdbClient } from '@/services/tmdb';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function MovieWatchProvidersPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const movieId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [movie, setMovie] = useState<any>(null);
-  const [providers, setProviders] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    async function loadWatchProviders() {
-      if (!movieId) return;
-      setLoading(true);
-      try {
-        const [mRes, pRes] = await Promise.all([
-          tmdbClient.getMovieDetails(movieId),
-          tmdbClient.getMovieWatchProvidersDetails(movieId)
-        ]);
-        setMovie(mRes);
-        setProviders(pRes.results || {});
-      } catch (e) {
-        console.error('Failed loading watch providers', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadWatchProviders();
-  }, [movieId]);
+async function getData(id: number) {
+  try {
+    const [movie, watchProvidersRes] = await Promise.all([
+      tmdbClient.getMovieDetails(id),
+      tmdbClient.getMovieWatchProvidersDetails(id),
+    ]);
+    return { movie, providers: watchProvidersRes.results || {} };
+  } catch {
+    return null;
+  }
+}
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading streaming options...</div>;
-  if (!movie) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">Movie not found</div>;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const data = await getData(parseInt(id, 10));
+  if (!data) return { title: 'Movie Not Found', robots: { index: false, follow: false } };
+  return buildMetadata({
+    title: `Watch Providers — ${data.movie.title}`,
+    description: `Streaming, rental, and purchase availability by country for ${data.movie.title}.`,
+    path: `/movie/${id}/watch-providers`,
+  });
+}
+
+export default async function MovieWatchProvidersPage({ params }: PageProps) {
+  const { id } = await params;
+  const movieId = parseInt(id, 10);
+  const data = await getData(movieId);
+
+  if (!data) {
+    notFound();
+  }
+
+  const { movie, providers } = data;
+  const entries = Object.entries(providers).slice(0, 15);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -49,25 +60,29 @@ export default function MovieWatchProvidersPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Object.entries(providers).slice(0, 15).map(([countryCode, data]: [string, any]) => (
-          <div key={countryCode} className="bg-gray-900/60 p-6 rounded-2xl border border-gray-800 space-y-3">
-            <h3 className="font-bold text-base text-brand-400">{countryCode} Territory</h3>
-            {data.flatrate && (
-              <div className="space-y-1">
-                <span className="text-xs font-semibold text-gray-400">Stream:</span>
-                <p className="text-xs text-white font-bold">{data.flatrate.map((p: any) => p.provider_name).join(', ')}</p>
-              </div>
-            )}
-            {data.buy && (
-              <div className="space-y-1">
-                <span className="text-xs font-semibold text-gray-400">Buy/Rent:</span>
-                <p className="text-xs text-gray-300">{data.buy.map((p: any) => p.provider_name).join(', ')}</p>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+      {entries.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {entries.map(([countryCode, providerData]: [string, any]) => (
+            <div key={countryCode} className="bg-gray-900/60 p-6 rounded-2xl border border-gray-800 space-y-3">
+              <h3 className="font-bold text-base text-brand-400">{countryCode} Territory</h3>
+              {providerData.flatrate && (
+                <div className="space-y-1">
+                  <span className="text-xs font-semibold text-gray-400">Stream:</span>
+                  <p className="text-xs text-white font-bold">{providerData.flatrate.map((p: any) => p.provider_name).join(', ')}</p>
+                </div>
+              )}
+              {providerData.buy && (
+                <div className="space-y-1">
+                  <span className="text-xs font-semibold text-gray-400">Buy/Rent:</span>
+                  <p className="text-xs text-gray-300">{providerData.buy.map((p: any) => p.provider_name).join(', ')}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400">No watch provider information available.</p>
+      )}
     </div>
   );
 }

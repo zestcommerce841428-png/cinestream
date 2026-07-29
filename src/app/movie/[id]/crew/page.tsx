@@ -1,42 +1,52 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import React from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { Briefcase, ArrowLeft } from 'lucide-react';
 import { tmdbClient } from '@/services/tmdb';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function MovieCrewPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const movieId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [movie, setMovie] = useState<any>(null);
-  const [crew, setCrew] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    async function loadCrew() {
-      if (!movieId) return;
-      setLoading(true);
-      try {
-        const [mRes, cRes] = await Promise.all([
-          tmdbClient.getMovieDetails(movieId),
-          tmdbClient.getMovieCredits(movieId)
-        ]);
-        setMovie(mRes);
-        setCrew(cRes.crew || []);
-      } catch (e) {
-        console.error('Failed loading movie crew', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadCrew();
-  }, [movieId]);
+async function getData(id: number) {
+  try {
+    const [movie, credits] = await Promise.all([
+      tmdbClient.getMovieDetails(id),
+      tmdbClient.getMovieCredits(id),
+    ]);
+    return { movie, crew: credits.crew || [] };
+  } catch {
+    return null;
+  }
+}
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading crew roster...</div>;
-  if (!movie) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">Movie not found</div>;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const data = await getData(parseInt(id, 10));
+  if (!data) return { title: 'Movie Not Found', robots: { index: false, follow: false } };
+  return buildMetadata({
+    title: `Full Crew — ${data.movie.title}`,
+    description: `Complete crew list grouped by department for ${data.movie.title}.`,
+    path: `/movie/${id}/crew`,
+  });
+}
 
-  const departmentsMap = crew.reduce((acc: any, member) => {
+export default async function MovieCrewPage({ params }: PageProps) {
+  const { id } = await params;
+  const movieId = parseInt(id, 10);
+  const data = await getData(movieId);
+
+  if (!data) {
+    notFound();
+  }
+
+  const { movie, crew } = data;
+
+  const departmentsMap = crew.reduce((acc: any, member: any) => {
     const dept = member.department || 'Other';
     if (!acc[dept]) acc[dept] = [];
     acc[dept].push(member);
@@ -56,21 +66,25 @@ export default function MovieCrewPage({ params }: { params: Promise<{ id: string
         </div>
       </div>
 
-      <div className="space-y-8">
-        {Object.entries(departmentsMap).map(([deptName, members]: [string, any]) => (
-          <div key={deptName} className="bg-gray-900/60 p-6 rounded-2xl border border-gray-800 space-y-4">
-            <h2 className="text-lg font-bold text-brand-400">{deptName} Department</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {members.map((m: any, idx: number) => (
-                <Link key={idx} href={`/person/${m.id}`} className="p-3 bg-gray-950 rounded-xl border border-gray-800 hover:border-brand-500/40 transition">
-                  <h3 className="font-bold text-xs text-white">{m.name}</h3>
-                  <p className="text-[11px] text-gray-400">{m.job}</p>
-                </Link>
-              ))}
+      {crew.length > 0 ? (
+        <div className="space-y-8">
+          {Object.entries(departmentsMap).map(([deptName, members]: [string, any]) => (
+            <div key={deptName} className="bg-gray-900/60 p-6 rounded-2xl border border-gray-800 space-y-4">
+              <h2 className="text-lg font-bold text-brand-400">{deptName} Department</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {members.map((m: any, idx: number) => (
+                  <Link key={idx} href={`/person/${m.id}`} className="p-3 bg-gray-950 rounded-xl border border-gray-800 hover:border-brand-500/40 transition">
+                    <h3 className="font-bold text-xs text-white">{m.name}</h3>
+                    <p className="text-[11px] text-gray-400">{m.job}</p>
+                  </Link>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400">No crew information available.</p>
+      )}
     </div>
   );
 }

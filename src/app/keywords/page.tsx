@@ -1,32 +1,37 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Tag, Search } from 'lucide-react';
+import { Tag } from 'lucide-react';
 import { tmdbClient } from '@/services/tmdb';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function KeywordsDirectoryPage() {
-  const [query, setQuery] = useState('hero');
-  const [keywords, setKeywords] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+export const revalidate = 3600;
 
-  const presets = ['hero', 'space', 'robot', 'magic', 'superhero', 'zombie', 'time travel', 'alien', 'anime', 'spy'];
+const PRESETS = ['hero', 'space', 'robot', 'magic', 'superhero', 'zombie', 'time travel', 'alien', 'anime', 'spy'];
 
-  useEffect(() => {
-    async function loadKeywords() {
-      if (!query.trim()) return;
-      setLoading(true);
-      try {
-        const res = await tmdbClient.searchKeywordsList(query);
-        setKeywords(res.results || []);
-      } catch (e) {
-        console.error('Failed loading keywords', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadKeywords();
-  }, [query]);
+interface KeywordsPageProps {
+  searchParams: Promise<{ q?: string }>;
+}
+
+function resolveQuery(raw?: string): string {
+  return raw && PRESETS.includes(raw) ? raw : 'hero';
+}
+
+export async function generateMetadata({ searchParams }: KeywordsPageProps): Promise<Metadata> {
+  const { q } = await searchParams;
+  const query = resolveQuery(q);
+  return buildMetadata({
+    title: `"${query}" Keywords — Movie Keywords & Plot Tropes Index`,
+    description: `Browse TMDB plot keywords and thematic tags matching "${query}", part of a searchable index of thousands of movie tropes.`,
+    path: query === 'hero' ? '/keywords' : `/keywords?q=${encodeURIComponent(query)}`,
+  });
+}
+
+export default async function KeywordsDirectoryPage({ searchParams }: KeywordsPageProps) {
+  const { q } = await searchParams;
+  const query = resolveQuery(q);
+
+  const res = await tmdbClient.searchKeywordsList(query);
+  const keywords = res.results || [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -38,22 +43,22 @@ export default function KeywordsDirectoryPage() {
         <p className="text-gray-400 text-sm">Browse thousands of plot keywords, tropes, and thematic tags.</p>
 
         <div className="flex flex-wrap gap-2 pt-2">
-          {presets.map((p) => (
-            <button
+          {PRESETS.map((p) => (
+            <Link
               key={p}
-              onClick={() => setQuery(p)}
+              href={`/keywords?q=${encodeURIComponent(p)}`}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
                 query === p ? 'bg-brand-600 text-white border-brand-500' : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white'
               }`}
             >
               #{p}
-            </button>
+            </Link>
           ))}
         </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        {keywords.map((k) => (
+        {keywords.map((k: any) => (
           <Link
             key={k.id}
             href={`/keyword/${k.id}`}
