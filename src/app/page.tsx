@@ -1,66 +1,72 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
-import Image from 'next/image';
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Play, Info, Flame, Film, Tv, Star, Sparkles, Clapperboard } from 'lucide-react';
-import { tmdbClient, getBackdropUrl, Movie, TVShow, Video } from '@/services/tmdb';
+import Image from 'next/image';
+import { Info, Flame, Film, Tv, Sparkles, Clapperboard, Star } from 'lucide-react';
+import { tmdbClient, getBackdropUrl, Movie, Video } from '@/services/tmdb';
 import MediaCarousel from '@/components/MediaCarousel';
-import VideoModal from '@/components/VideoModal';
+import HeroTrailerButton from '@/components/HeroTrailerButton';
+import { SITE_NAME, truncateDescription } from '@/lib/metadata';
+import { jsonLdScriptProps, websiteJsonLd } from '@/lib/jsonld';
 
-export default function HomePage() {
-  const [heroMovie, setHeroMovie] = useState<Movie | null>(null);
-  const [heroVideoKey, setHeroVideoKey] = useState<string | null>(null);
-  const [activeVideoModal, setActiveVideoModal] = useState<string | null>(null);
+export const revalidate = 3600;
 
-  const [trendingDay, setTrendingDay] = useState<any[]>([]);
-  const [nowPlaying, setNowPlaying] = useState<Movie[]>([]);
-  const [topRatedTV, setTopRatedTV] = useState<TVShow[]>([]);
-  const [popularMovies, setPopularMovies] = useState<Movie[]>([]);
-  const [genres, setGenres] = useState<{ id: number; name: string }[]>([]);
-  const [loading, setLoading] = useState(true);
+const HOME_TITLE = `${SITE_NAME} — Discover Movies & TV Shows`;
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [
-          trendingRes,
-          nowPlayingRes,
-          topRatedTvRes,
-          popularRes,
-          genresRes
-        ] = await Promise.all([
-          tmdbClient.getTrendingAllDay(),
-          tmdbClient.getMovieNowPlaying(),
-          tmdbClient.getTVTopRated(),
-          tmdbClient.getMoviePopular(),
-          tmdbClient.getMovieGenres()
-        ]);
+export async function generateMetadata(): Promise<Metadata> {
+  const trending = await tmdbClient.getTrendingAllDay().catch(() => null);
+  const hero = trending?.results?.[0] as (Movie & { name?: string; media_type?: string }) | undefined;
+  const heroTitle = hero?.title || hero?.name;
+  const description = heroTitle
+    ? `Trending now: ${heroTitle}. ${truncateDescription(hero?.overview, 100)}`
+    : undefined;
+  const image = hero?.backdrop_path ? getBackdropUrl(hero.backdrop_path, 'w1280') : undefined;
 
-        const heroItem = trendingRes.results[0];
-        setHeroMovie(heroItem);
-        setTrendingDay(trendingRes.results);
-        setNowPlaying(nowPlayingRes.results);
-        setTopRatedTV(topRatedTvRes.results);
-        setPopularMovies(popularRes.results);
-        setGenres(genresRes.genres);
+  return {
+    title: { absolute: HOME_TITLE },
+    description,
+    alternates: { canonical: '/' },
+    openGraph: {
+      title: HOME_TITLE,
+      description,
+      url: '/',
+      images: image ? [{ url: image, width: 1280, height: 720, alt: heroTitle }] : undefined,
+    },
+    twitter: {
+      card: image ? 'summary_large_image' : 'summary',
+      title: HOME_TITLE,
+      description,
+      images: image ? [image] : undefined,
+    },
+  };
+}
 
-        if (heroItem?.id) {
-          const videos = await tmdbClient.getMovieVideos(heroItem.id).catch(() => null);
-          const trailer = videos?.results?.find((v: Video) => v.type === 'Trailer' && v.site === 'YouTube');
-          if (trailer) setHeroVideoKey(trailer.key);
-        }
-      } catch (err) {
-        console.error('Error fetching home page data:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadData();
-  }, []);
+export default async function HomePage() {
+  const [trendingRes, nowPlayingRes, topRatedTvRes, popularRes, genresRes] = await Promise.all([
+    tmdbClient.getTrendingAllDay(),
+    tmdbClient.getMovieNowPlaying(),
+    tmdbClient.getTVTopRated(),
+    tmdbClient.getMoviePopular(),
+    tmdbClient.getMovieGenres(),
+  ]);
+
+  const heroMovie = trendingRes.results[0] as (Movie & { name?: string; media_type?: string }) | undefined;
+  const trendingDay = trendingRes.results;
+  const nowPlaying = nowPlayingRes.results;
+  const topRatedTV = topRatedTvRes.results;
+  const popularMovies = popularRes.results;
+  const genres = genresRes.genres;
+
+  let heroVideoKey: string | null = null;
+  if (heroMovie?.id) {
+    const videos = await tmdbClient.getMovieVideos(heroMovie.id).catch(() => null);
+    const trailer = videos?.results?.find((v: Video) => v.type === 'Trailer' && v.site === 'YouTube');
+    heroVideoKey = trailer?.key || null;
+  }
 
   return (
     <div className="space-y-12">
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScriptProps(websiteJsonLd())} />
+
       {/* Hero Section */}
       {heroMovie && (
         <section className="relative w-full h-[70vh] min-h-[500px] max-h-[750px] overflow-hidden flex items-end">
@@ -69,10 +75,10 @@ export default function HomePage() {
             {heroMovie.backdrop_path && (
               <Image
                 src={getBackdropUrl(heroMovie.backdrop_path, 'original')}
-                alt={heroMovie.title || (heroMovie as any).name || 'Hero'}
+                alt={heroMovie.title || heroMovie.name || 'Hero'}
                 fill
                 priority
-                className="object-cover opacity-60 scale-105 transition-all duration-1000"
+                className="object-cover opacity-60 scale-105"
               />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-900/40 to-transparent" />
@@ -93,7 +99,7 @@ export default function HomePage() {
             </div>
 
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-none max-w-3xl drop-shadow-md">
-              {heroMovie.title || (heroMovie as any).name}
+              {heroMovie.title || heroMovie.name}
             </h1>
 
             <p className="text-sm sm:text-base text-gray-300 max-w-2xl line-clamp-3 leading-relaxed drop-shadow">
@@ -101,18 +107,10 @@ export default function HomePage() {
             </p>
 
             <div className="flex items-center space-x-4 pt-2">
-              {heroVideoKey && (
-                <button
-                  onClick={() => setActiveVideoModal(heroVideoKey)}
-                  className="flex items-center space-x-2 px-6 py-3 rounded-2xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm shadow-xl shadow-brand-600/30 transition-all hover:scale-105"
-                >
-                  <Play className="w-4 h-4 fill-current" />
-                  <span>Watch Trailer</span>
-                </button>
-              )}
+              <HeroTrailerButton videoKey={heroVideoKey} />
 
               <Link
-                href={`/${(heroMovie as any).media_type === 'tv' ? 'tv' : 'movie'}/${heroMovie.id}`}
+                href={`/${heroMovie.media_type === 'tv' ? 'tv' : 'movie'}/${heroMovie.id}`}
                 className="flex items-center space-x-2 px-6 py-3 rounded-2xl bg-gray-800/80 hover:bg-gray-700 border border-gray-700 text-white font-semibold text-sm backdrop-blur-md transition-all hover:scale-105"
               >
                 <Info className="w-4 h-4" />
@@ -145,11 +143,7 @@ export default function HomePage() {
         </section>
 
         {/* Trending All Carousel */}
-        <MediaCarousel
-          title="Trending Today"
-          items={trendingDay}
-          icon={<Flame className="w-6 h-6 text-brand-500" />}
-        />
+        <MediaCarousel title="Trending Today" items={trendingDay} icon={<Flame className="w-6 h-6 text-brand-500" />} />
 
         {/* Now Playing Movies */}
         <MediaCarousel
@@ -175,9 +169,6 @@ export default function HomePage() {
           icon={<Clapperboard className="w-6 h-6 text-amber-400" />}
         />
       </div>
-
-      {/* Video Trailer Modal */}
-      <VideoModal videoKey={activeVideoModal} onClose={() => setActiveVideoModal(null)} />
     </div>
   );
 }

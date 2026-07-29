@@ -1,11 +1,9 @@
-'use client';
-
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Bookmark, Star } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { getImageUrl } from '@/services/tmdb';
-import { useWatchlist } from '@/context/WatchlistContext';
+import WatchlistButton from '@/components/WatchlistButton';
 
 interface MovieCardProps {
   id: number;
@@ -24,28 +22,8 @@ export default function MovieCard({
   releaseDate,
   mediaType = 'movie',
 }: MovieCardProps) {
-  const { addToWatchlist, removeFromWatchlist, isInWatchlist } = useWatchlist();
-  const isSaved = isInWatchlist(id, mediaType);
-
   const year = releaseDate ? new Date(releaseDate).getFullYear() : '';
   const href = mediaType === 'movie' ? `/movie/${id}` : `/tv/${id}`;
-
-  const toggleWatchlist = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (isSaved) {
-      removeFromWatchlist(id, mediaType);
-    } else {
-      addToWatchlist({
-        id,
-        title,
-        poster_path: posterPath,
-        vote_average: voteAverage,
-        release_date: releaseDate,
-        type: mediaType,
-      });
-    }
-  };
 
   return (
     <div className="group relative flex flex-col bg-gray-900/60 rounded-2xl overflow-hidden border border-gray-800/80 hover:border-brand-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-brand-600/10 hover:-translate-y-1">
@@ -70,17 +48,16 @@ export default function MovieCard({
           <span className="bg-dark-900/80 backdrop-blur-md px-2 py-1 rounded-lg text-xs font-semibold uppercase tracking-wider text-rose-400 border border-white/10">
             {mediaType}
           </span>
-          <button
-            onClick={toggleWatchlist}
-            className={`pointer-events-auto p-2 rounded-xl backdrop-blur-md transition-all shadow-md ${
-              isSaved
-                ? 'bg-brand-600 text-white'
-                : 'bg-dark-900/80 text-gray-300 hover:text-white hover:bg-gray-800'
-            }`}
-            title={isSaved ? 'Remove from Watchlist' : 'Add to Watchlist'}
-          >
-            <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
-          </button>
+          <WatchlistButton
+            item={{
+              id,
+              title,
+              poster_path: posterPath,
+              vote_average: voteAverage,
+              release_date: releaseDate,
+              type: mediaType,
+            }}
+          />
         </div>
 
         {/* Rating overlay bottom */}

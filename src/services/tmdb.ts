@@ -1,7 +1,23 @@
 // TMDB API Service supporting 500+ endpoints with full TypeScript definitions & Append-to-Response
-export const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY || '52217232f795bbefbb1b7c951aae98ad';
+//
+// `TMDB_API_KEY` is intentionally server-only (no `NEXT_PUBLIC_` prefix, no hardcoded
+// fallback). Every `tmdbClient`/`tmdbAuthClient` call in this app runs from Server
+// Components or Route Handlers, so the key never reaches the browser bundle. The one
+// deliberate exception is the "API Explorer" playground (src/app/api-explorer), which
+// is an intentionally client-side "try a live request" tool and reads its own separate,
+// optional `NEXT_PUBLIC_TMDB_EXPLORER_KEY` — see src/app/api-explorer for details.
+export const TMDB_API_KEY = process.env.TMDB_API_KEY ?? '';
 export const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 export const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
+
+function assertApiKey(): string {
+  if (!TMDB_API_KEY) {
+    throw new Error(
+      'Missing TMDB_API_KEY environment variable. Add TMDB_API_KEY=<your TMDB v3 key> to .env.local (see .env.local.example).'
+    );
+  }
+  return TMDB_API_KEY;
+}
 
 export function getImageUrl(path: string | null | undefined, size: 'w92' | 'w154' | 'w185' | 'w300' | 'w342' | 'w500' | 'w780' | 'original' = 'w500'): string {
   if (!path) return '/placeholder-poster.png';
@@ -116,7 +132,7 @@ export interface WatchProvider {
 
 async function tmdbFetch<T>(endpoint: string, params: Record<string, string | number | boolean> = {}): Promise<T> {
   const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
-  url.searchParams.append('api_key', TMDB_API_KEY);
+  url.searchParams.append('api_key', assertApiKey());
   url.searchParams.append('language', 'en-US');
 
   Object.entries(params).forEach(([key, val]) => {

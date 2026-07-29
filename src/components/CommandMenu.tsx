@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Film, Tv, Flame, Star, Calendar, User, Layers, Sparkles, Globe, Terminal, Bookmark, X, Command } from 'lucide-react';
-import { tmdbClient } from '@/services/tmdb';
+import { searchMultiAction } from '@/lib/actions';
 
 export default function CommandMenu({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const router = useRouter();
@@ -60,7 +60,7 @@ export default function CommandMenu({ isOpen, onClose }: { isOpen: boolean; onCl
       }
       setLoading(true);
       try {
-        const res = await tmdbClient.searchMulti(query);
+        const res = await searchMultiAction(query);
         setResults(res.results?.slice(0, 6) || []);
       } catch (e) {
         console.error('Command menu search error', e);

@@ -1,6 +1,7 @@
 {
-  "short_name": "TMDb App",
-  "name": "Movie Search Application",
+  "short_name": "CineStream",
+  "name": "CineStream — Movies & TV Discovery",
+  "description": "Discover trending movies and TV shows, explore cast & crew, watch trailers, and build your personal watchlist.",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,16 +11,20 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "orientation": "portrait-primary",
+  "theme_color": "#e11d48",
+  "background_color": "#0b0f19"
 }
