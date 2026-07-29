@@ -1,21 +1,27 @@
-'use client';
-
 import React from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Film, Layers } from 'lucide-react';
+import { Layers } from 'lucide-react';
+import { buildMetadata } from '@/lib/metadata';
+
+export const metadata: Metadata = buildMetadata({
+  title: 'Major Film Production Studios',
+  description: 'Catalog of leading film and television production studios worldwide, from Marvel Studios to A24.',
+  path: '/studios',
+});
+
+const majorStudios = [
+  { id: 420, name: 'Marvel Studios', desc: 'Creators of the MCU' },
+  { id: 33, name: 'Universal Pictures', desc: 'Jurassic World, Fast & Furious, Oppenheimer' },
+  { id: 174, name: 'Warner Bros. Pictures', desc: 'DC, Harry Potter, Dune, The Dark Knight' },
+  { id: 34, name: 'Sony Pictures', desc: 'Spider-Man Universe, Venom' },
+  { id: 4, name: 'Paramount Pictures', desc: 'Top Gun, Mission: Impossible, Transformers' },
+  { id: 41077, name: 'A24', desc: 'Everything Everywhere, Hereditary, Civil War' },
+  { id: 3172, name: 'Blumhouse Productions', desc: "Get Out, Five Nights at Freddy's, M3GAN" },
+  { id: 1632, name: 'Lionsgate', desc: 'John Wick, Hunger Games, Saw' },
+];
 
 export default function StudiosPage() {
-  const majorStudios = [
-    { id: 420, name: 'Marvel Studios', desc: 'Creators of the MCU' },
-    { id: 33, name: 'Universal Pictures', desc: 'Jurassic World, Fast & Furious, Oppenheimer' },
-    { id: 174, name: 'Warner Bros. Pictures', desc: 'DC, Harry Potter, Dune, The Dark Knight' },
-    { id: 34, name: 'Sony Pictures', desc: 'Spider-Man Universe, Venom' },
-    { id: 4, name: 'Paramount Pictures', desc: 'Top Gun, Mission: Impossible, Transformers' },
-    { id: 41077, name: 'A24', desc: 'Everything Everywhere, Hereditary, Civil War' },
-    { id: 3172, name: 'Blumhouse Productions', desc: 'Get Out, Five Nights at Freddy\'s, M3GAN' },
-    { id: 1632, name: 'Lionsgate', desc: 'John Wick, Hunger Games, Saw' },
-  ];
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       <div className="border-b border-gray-800 pb-6">

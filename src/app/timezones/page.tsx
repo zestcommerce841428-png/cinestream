@@ -1,27 +1,18 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
-import { Clock, Globe } from 'lucide-react';
+import type { Metadata } from 'next';
+import { Clock } from 'lucide-react';
 import { tmdbClient } from '@/services/tmdb';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function TimezonesPage() {
-  const [timezones, setTimezones] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+export const revalidate = 86400;
 
-  useEffect(() => {
-    async function loadTimezones() {
-      setLoading(true);
-      try {
-        const res = await tmdbClient.getTimezones();
-        setTimezones(res || []);
-      } catch (e) {
-        console.error('Failed loading timezones', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadTimezones();
-  }, []);
+export const metadata: Metadata = buildMetadata({
+  title: 'Global Cinema Timezones & Regional Broadcast Times',
+  description: 'Official broadcast timezones for international television airings by country.',
+  path: '/timezones',
+});
+
+export default async function TimezonesPage() {
+  const timezones = await tmdbClient.getTimezones();
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -33,18 +24,14 @@ export default function TimezonesPage() {
         <p className="text-gray-400 text-sm mt-1">Official broadcast timezones for international television airings.</p>
       </div>
 
-      {loading ? (
-        <div className="text-gray-400">Loading timezones...</div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-          {timezones.slice(0, 40).map((tz, idx) => (
-            <div key={idx} className="bg-gray-900/60 p-4 rounded-xl border border-gray-800 flex items-center justify-between">
-              <span className="font-bold text-xs text-white">{tz.iso_3166_1}</span>
-              <span className="text-xs text-gray-400 truncate max-w-[200px]">{tz.zones?.join(', ')}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        {timezones.slice(0, 40).map((tz: any, idx: number) => (
+          <div key={idx} className="bg-gray-900/60 p-4 rounded-xl border border-gray-800 flex items-center justify-between">
+            <span className="font-bold text-xs text-white">{tz.iso_3166_1}</span>
+            <span className="text-xs text-gray-400 truncate max-w-[200px]">{tz.zones?.join(', ')}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,28 +1,27 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
-import { Calendar, Clock } from 'lucide-react';
-import { tmdbClient, Movie } from '@/services/tmdb';
+import type { Metadata } from 'next';
+import { Calendar } from 'lucide-react';
+import { tmdbClient } from '@/services/tmdb';
 import MovieCard from '@/components/MovieCard';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function ReleaseCalendarPage() {
-  const [movies, setMovies] = useState<Movie[]>([]);
-  const [loading, setLoading] = useState(true);
+export const revalidate = 3600;
 
-  useEffect(() => {
-    async function loadCalendar() {
-      setLoading(true);
-      try {
-        const res = await tmdbClient.getMovieUpcoming();
-        setMovies(res.results || []);
-      } catch (e) {
-        console.error('Failed loading release calendar', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadCalendar();
-  }, []);
+export const metadata: Metadata = buildMetadata({
+  title: 'Global Theatrical Release Calendar',
+  description: 'Upcoming movie releases sorted chronologically by release date, soonest first.',
+  path: '/release-calendar',
+});
+
+export default async function ReleaseCalendarPage() {
+  const today = new Date().toISOString().slice(0, 10);
+  // Distinct from /upcoming (TMDB's popularity-ranked "upcoming" list): this sorts strictly
+  // chronologically by release date, which is what a "calendar" implies.
+  const res = await tmdbClient.discoverMovies({
+    'primary_release_date.gte': today,
+    sort_by: 'primary_release_date.asc',
+    'vote_count.gte': 1,
+  });
+  const movies = res.results || [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -31,16 +30,10 @@ export default function ReleaseCalendarPage() {
           <Calendar className="w-8 h-8 text-brand-500" />
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Global Theatrical Release Calendar</h1>
         </div>
-        <p className="text-gray-400 text-sm mt-1">Upcoming theatrical and digital premiere release calendar.</p>
+        <p className="text-gray-400 text-sm mt-1">Upcoming releases sorted chronologically by release date, soonest first.</p>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-          {Array.from({ length: 10 }).map((_, i) => (
-            <div key={i} className="aspect-[2/3] bg-gray-900 animate-pulse rounded-2xl border border-gray-800" />
-          ))}
-        </div>
-      ) : (
+      {movies.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
           {movies.map((m) => (
             <MovieCard
@@ -54,6 +47,8 @@ export default function ReleaseCalendarPage() {
             />
           ))}
         </div>
+      ) : (
+        <p className="text-sm text-gray-400">No upcoming releases found.</p>
       )}
     </div>
   );

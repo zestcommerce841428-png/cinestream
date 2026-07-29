@@ -1,27 +1,19 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
+import type { Metadata } from 'next';
 import { MessageSquare, Star } from 'lucide-react';
-import { tmdbClient, Review } from '@/services/tmdb';
+import { tmdbClient } from '@/services/tmdb';
+import { buildMetadata } from '@/lib/metadata';
 
-export default function ReviewsPage() {
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
+export const revalidate = 3600;
 
-  useEffect(() => {
-    async function loadReviews() {
-      setLoading(true);
-      try {
-        const res = await tmdbClient.getTrendingReviewsStream();
-        setReviews(res.results || []);
-      } catch (e) {
-        console.error('Error fetching reviews', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadReviews();
-  }, []);
+export const metadata: Metadata = buildMetadata({
+  title: 'Critic & Community Reviews Stream',
+  description: 'Read honest audience and critic reviews for popular movies.',
+  path: '/reviews',
+});
+
+export default async function ReviewsPage() {
+  const res = await tmdbClient.getTrendingReviewsStream();
+  const reviews = res.results || [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -33,13 +25,7 @@ export default function ReviewsPage() {
         <p className="text-gray-400 text-sm mt-1">Read honest audience and critic reviews for popular titles.</p>
       </div>
 
-      {loading ? (
-        <div className="space-y-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-36 bg-gray-900 animate-pulse rounded-2xl border border-gray-800" />
-          ))}
-        </div>
-      ) : (
+      {reviews.length > 0 ? (
         <div className="space-y-4">
           {reviews.map((rev) => (
             <div key={rev.id} className="bg-gray-900/60 p-6 rounded-2xl border border-gray-800 space-y-3">
@@ -55,12 +41,12 @@ export default function ReviewsPage() {
                 </div>
                 <span className="text-xs text-gray-500">{new Date(rev.created_at).toLocaleDateString()}</span>
               </div>
-              <p className="text-sm text-gray-300 leading-relaxed max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                {rev.content}
-              </p>
+              <p className="text-sm text-gray-300 leading-relaxed max-h-48 overflow-y-auto pr-2 custom-scrollbar">{rev.content}</p>
             </div>
           ))}
         </div>
+      ) : (
+        <p className="text-sm text-gray-400">No reviews available right now.</p>
       )}
     </div>
   );

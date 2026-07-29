@@ -1,19 +1,24 @@
-'use client';
-
 import React from 'react';
-import Link from 'next/link';
-import { Music, Disc, Star } from 'lucide-react';
+import type { Metadata } from 'next';
+import { Music, Disc } from 'lucide-react';
+import { buildMetadata } from '@/lib/metadata';
+
+export const metadata: Metadata = buildMetadata({
+  title: 'Soundtracks & Legendary Composers',
+  description: 'Explore film scores, legendary music directors, and iconic movie soundtracks.',
+  path: '/soundtracks',
+});
+
+const masterComposers = [
+  { name: 'Hans Zimmer', works: 'Interstellar, Inception, The Dark Knight, Dune, Gladiator', icon: '🎼' },
+  { name: 'John Williams', works: 'Star Wars, Jurassic Park, Indiana Jones, Harry Potter', icon: '🎷' },
+  { name: 'Ennio Morricone', works: 'The Good, the Bad and the Ugly, Cinema Paradiso, The Hateful Eight', icon: '🎺' },
+  { name: 'Howard Shore', works: 'The Lord of the Rings, The Hobbit, Seven, The Silence of the Lambs', icon: '🎻' },
+  { name: 'Ludwig Göransson', works: 'Oppenheimer, Black Panther, Tenet, The Mandalorian', icon: '🎹' },
+  { name: 'Alan Silvestri', works: 'Back to the Future, Avengers: Endgame, Forrest Gump', icon: '🥁' },
+];
 
 export default function SoundtracksPage() {
-  const masterComposers = [
-    { name: 'Hans Zimmer', works: 'Interstellar, Inception, The Dark Knight, Dune, Gladiator', icon: '🎼' },
-    { name: 'John Williams', works: 'Star Wars, Jurassic Park, Indiana Jones, Harry Potter', icon: '🎷' },
-    { name: 'Ennio Morricone', works: 'The Good, the Bad and the Ugly, Cinema Paradiso, The Hateful Eight', icon: '🎺' },
-    { name: 'Howard Shore', works: 'The Lord of the Rings, The Hobbit, Seven, The Silence of the Lambs', icon: '🎻' },
-    { name: 'Ludwig Göransson', works: 'Oppenheimer, Black Panther, Tenet, The Mandalorian', icon: '🎹' },
-    { name: 'Alan Silvestri', works: 'Back to the Future, Avengers: Endgame, Forrest Gump', icon: '🥁' },
-  ];
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       <div className="border-b border-gray-800 pb-6">
@@ -32,7 +37,9 @@ export default function SoundtracksPage() {
               <Disc className="w-5 h-5 text-rose-400" />
             </div>
             <h3 className="font-extrabold text-lg text-white">{c.name}</h3>
-            <p className="text-xs text-gray-400 leading-relaxed pt-1"><strong>Key Works:</strong> {c.works}</p>
+            <p className="text-xs text-gray-400 leading-relaxed pt-1">
+              <strong>Key Works:</strong> {c.works}
+            </p>
           </div>
         ))}
       </div>
