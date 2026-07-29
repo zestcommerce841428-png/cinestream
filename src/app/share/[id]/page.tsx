@@ -1,36 +1,48 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import React from 'react';
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Share2, ArrowLeft, Star, Film } from 'lucide-react';
+import { notFound } from 'next/navigation';
+import { Share2, ArrowLeft } from 'lucide-react';
 import { tmdbClient, getImageUrl, getBackdropUrl } from '@/services/tmdb';
+import { buildMetadata, truncateDescription } from '@/lib/metadata';
 
-export default function ShareCardPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const movieId = parseInt(resolvedParams.id, 10);
+export const revalidate = 3600;
 
-  const [movie, setMovie] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-  useEffect(() => {
-    async function loadShareCard() {
-      if (!movieId) return;
-      setLoading(true);
-      try {
-        const res = await tmdbClient.getMovieDetails(movieId);
-        setMovie(res);
-      } catch (e) {
-        console.error('Failed loading share card movie', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadShareCard();
-  }, [movieId]);
+async function getMovie(id: number) {
+  try {
+    return await tmdbClient.getMovieDetails(id);
+  } catch {
+    return null;
+  }
+}
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Generating social share card...</div>;
-  if (!movie) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">Movie not found</div>;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const movie = await getMovie(parseInt(id, 10));
+  if (!movie) return { title: 'Movie Not Found', robots: { index: false, follow: false } };
+
+  return buildMetadata({
+    title: `${movie.title} — Share Card`,
+    description: truncateDescription(movie.overview),
+    path: `/share/${id}`,
+    image: movie.backdrop_path ? getBackdropUrl(movie.backdrop_path, 'w1280') : movie.poster_path ? getImageUrl(movie.poster_path, 'w780') : null,
+    type: 'video.movie',
+  });
+}
+
+export default async function ShareCardPage({ params }: PageProps) {
+  const { id } = await params;
+  const movieId = parseInt(id, 10);
+  const movie = await getMovie(movieId);
+
+  if (!movie) {
+    notFound();
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">

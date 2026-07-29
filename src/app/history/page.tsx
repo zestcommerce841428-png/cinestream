@@ -1,8 +1,15 @@
-'use client';
-
 import React from 'react';
-import { History, Film, Tv, Trash2 } from 'lucide-react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { History } from 'lucide-react';
+import { buildMetadata } from '@/lib/metadata';
+
+export const metadata: Metadata = buildMetadata({
+  title: 'Viewing History & Watch Log',
+  description: 'Track completed movies, TV episodes, and recently visited media pages.',
+  path: '/history',
+  noIndex: true,
+});
 
 export default function HistoryPage() {
   return (

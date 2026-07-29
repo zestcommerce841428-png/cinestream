@@ -1,48 +1,59 @@
-'use client';
-
-import React, { use, useEffect, useState } from 'react';
+import React from 'react';
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Play, Star, Calendar, Clock, User } from 'lucide-react';
-import { tmdbClient, getImageUrl } from '@/services/tmdb';
+import { notFound } from 'next/navigation';
+import { getImageUrl } from '@/services/tmdb';
+import { tmdbClient } from '@/services/tmdb';
+import { buildMetadata, truncateDescription } from '@/lib/metadata';
 
-export default function EpisodePage({ params }: { params: Promise<{ tvId: string; seasonNumber: string; episodeNumber: string }> }) {
-  const resolvedParams = use(params);
-  const tvId = parseInt(resolvedParams.tvId, 10);
-  const seasonNum = parseInt(resolvedParams.seasonNumber, 10);
-  const epNum = parseInt(resolvedParams.episodeNumber, 10);
+export const revalidate = 3600;
 
-  const [episode, setEpisode] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+interface PageProps {
+  params: Promise<{ tvId: string; seasonNumber: string; episodeNumber: string }>;
+}
 
-  useEffect(() => {
-    async function loadEpisode() {
-      if (!tvId || !seasonNum || !epNum) return;
-      setLoading(true);
-      try {
-        const res = await tmdbClient.getTVEpisodeDetailsDeep(tvId, seasonNum, epNum);
-        setEpisode(res);
-      } catch (e) {
-        console.error('Error fetching episode', e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadEpisode();
-  }, [tvId, seasonNum, epNum]);
+async function getEpisode(tvId: number, seasonNumber: number, episodeNumber: number) {
+  try {
+    return await tmdbClient.getTVEpisodeDetailsDeep(tvId, seasonNumber, episodeNumber);
+  } catch {
+    return null;
+  }
+}
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-20 text-gray-400">Loading episode details...</div>;
-  if (!episode) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-white">Episode not found</div>;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { tvId, seasonNumber, episodeNumber } = await params;
+  const episode = await getEpisode(parseInt(tvId, 10), parseInt(seasonNumber, 10), parseInt(episodeNumber, 10));
+  if (!episode) return { title: 'Episode Not Found', robots: { index: false, follow: false } };
+
+  return buildMetadata({
+    title: `S${seasonNumber}E${episodeNumber} — ${episode.name}`,
+    description: truncateDescription(episode.overview || `Episode ${episodeNumber} of season ${seasonNumber}.`),
+    path: `/episode/${tvId}/${seasonNumber}/${episodeNumber}`,
+    image: episode.still_path ? getImageUrl(episode.still_path, 'w780') : null,
+  });
+}
+
+export default async function EpisodePage({ params }: PageProps) {
+  const { tvId, seasonNumber, episodeNumber } = await params;
+  const tvIdNum = parseInt(tvId, 10);
+  const seasonNum = parseInt(seasonNumber, 10);
+  const epNum = parseInt(episodeNumber, 10);
+  const episode = await getEpisode(tvIdNum, seasonNum, epNum);
+
+  if (!episode) {
+    notFound();
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
       <div className="space-y-4">
-        <Link href={`/tv/${tvId}`} className="text-xs font-semibold text-purple-400 hover:underline">
-          ← Back to Series
+        <Link href={`/season/${tvIdNum}/${seasonNum}`} className="text-xs font-semibold text-purple-400 hover:underline">
+          ← Back to Season {seasonNum}
         </Link>
         <div className="relative aspect-video w-full max-h-[450px] rounded-3xl overflow-hidden bg-gray-950 border border-gray-800 shadow-2xl">
           {episode.still_path ? (
-            <Image src={getImageUrl(episode.still_path, 'w780')} alt={episode.name} fill className="object-cover" />
+            <Image src={getImageUrl(episode.still_path, 'w780')} alt={episode.name} fill priority className="object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-gray-600">No Episode Still</div>
           )}
@@ -65,6 +76,24 @@ export default function EpisodePage({ params }: { params: Promise<{ tvId: string
           {episode.vote_average > 0 && <span>Rating: ⭐ {episode.vote_average.toFixed(1)}</span>}
         </div>
       </div>
+
+      {episode.credits?.guest_stars?.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-white">Guest Stars</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {episode.credits.guest_stars.slice(0, 12).map((person: any) => (
+              <Link
+                key={person.id}
+                href={`/person/${person.id}`}
+                className="bg-gray-900/60 rounded-2xl overflow-hidden border border-gray-800 hover:border-purple-500/50 transition p-3"
+              >
+                <p className="text-xs font-bold text-white line-clamp-1">{person.name}</p>
+                <p className="text-[11px] text-gray-400 line-clamp-1">{person.character}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

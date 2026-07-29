@@ -42,7 +42,7 @@ export default function QuotesPage() {
       </div>
 
       <div className="bg-gray-900/80 p-10 rounded-3xl border border-gray-800 space-y-6">
-        <p className="text-2xl sm:text-3xl font-extrabold text-white leading-relaxed">"{current.quote}"</p>
+        <p className="text-2xl sm:text-3xl font-extrabold text-white leading-relaxed">&ldquo;{current.quote}&rdquo;</p>
         <Link href={`/movie/${current.movieId}`} className="inline-block text-sm font-bold text-brand-400 hover:underline">
           — {current.movie}
         </Link>

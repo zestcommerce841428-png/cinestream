@@ -1,17 +1,23 @@
-'use client';
-
 import React from 'react';
-import { Layers, DollarSign } from 'lucide-react';
+import type { Metadata } from 'next';
+import { Layers } from 'lucide-react';
+import { buildMetadata } from '@/lib/metadata';
+
+export const metadata: Metadata = buildMetadata({
+  title: 'Franchise Box Office & Financial Comparison Hub',
+  description: 'Financial benchmarks and cumulative box office metrics for the biggest film sagas, from the MCU to Star Wars.',
+  path: '/franchises-analytics',
+});
+
+const franchisesData = [
+  { name: 'Marvel Cinematic Universe (MCU)', revenue: '$29.8 Billion', films: 33, topFilm: 'Avengers: Endgame ($2.79B)' },
+  { name: 'Star Wars Universe', revenue: '$10.3 Billion', films: 12, topFilm: 'The Force Awakens ($2.07B)' },
+  { name: 'Harry Potter & Wizarding World', revenue: '$9.6 Billion', films: 11, topFilm: 'Deathly Hallows Part 2 ($1.34B)' },
+  { name: 'James Bond (007)', revenue: '$7.8 Billion', films: 25, topFilm: 'Skyfall ($1.10B)' },
+  { name: 'Lord of the Rings & Hobbit', revenue: '$5.9 Billion', films: 6, topFilm: 'Return of the King ($1.14B)' },
+];
 
 export default function FranchisesAnalyticsPage() {
-  const franchisesData = [
-    { name: 'Marvel Cinematic Universe (MCU)', revenue: '$29.8 Billion', films: 33, topFilm: 'Avengers: Endgame ($2.79B)' },
-    { name: 'Star Wars Universe', revenue: '$10.3 Billion', films: 12, topFilm: 'The Force Awakens ($2.07B)' },
-    { name: 'Harry Potter & Wizarding World', revenue: '$9.6 Billion', films: 11, topFilm: 'Deathly Hallows Part 2 ($1.34B)' },
-    { name: 'James Bond (077)', revenue: '$7.8 Billion', films: 25, topFilm: 'Skyfall ($1.10B)' },
-    { name: 'Lord of the Rings & Hobbit', revenue: '$5.9 Billion', films: 6, topFilm: 'Return of the King ($1.14B)' },
-  ];
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       <div className="border-b border-gray-800 pb-6">
@@ -28,7 +34,9 @@ export default function FranchisesAnalyticsPage() {
             <div>
               <span className="text-[11px] font-bold text-brand-400">Franchise Rank #{idx + 1}</span>
               <h3 className="font-extrabold text-xl text-white">{f.name}</h3>
-              <p className="text-xs text-gray-400 pt-1">Top Grossing Film: {f.topFilm}</p>
+              <p className="text-xs text-gray-400 pt-1">
+                {f.films} films • Top Grossing Film: {f.topFilm}
+              </p>
             </div>
             <div className="text-left sm:text-right">
               <span className="text-xs text-gray-400">Total Global Box Office</span>

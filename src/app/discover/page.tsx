@@ -8,7 +8,7 @@ import { buildMetadata } from '@/lib/metadata';
 export const revalidate = 3600;
 
 interface DiscoverPageProps {
-  searchParams: Promise<{ type?: string; genre?: string; year?: string; sort?: string; rating?: string }>;
+  searchParams: Promise<{ type?: string; genre?: string; year?: string; sort?: string; rating?: string; provider?: string; region?: string }>;
 }
 
 export async function generateMetadata({ searchParams }: DiscoverPageProps): Promise<Metadata> {
@@ -31,6 +31,8 @@ export default async function DiscoverPage({ searchParams }: DiscoverPageProps) 
   const year = sp.year || '';
   const sort = sp.sort || 'popularity.desc';
   const rating = sp.rating || '0';
+  const provider = sp.provider || '';
+  const region = sp.region || 'US';
 
   const genresRes = await (type === 'movie' ? tmdbClient.getMovieGenres() : tmdbClient.getTVGenres());
 
@@ -42,6 +44,10 @@ export default async function DiscoverPage({ searchParams }: DiscoverPageProps) 
   if (year) {
     if (type === 'movie') params.primary_release_year = year;
     else params.first_air_date_year = year;
+  }
+  if (provider) {
+    params.with_watch_providers = provider;
+    params.watch_region = region;
   }
 
   const results = await (type === 'movie' ? tmdbClient.discoverMovies(params) : tmdbClient.discoverTV(params));
