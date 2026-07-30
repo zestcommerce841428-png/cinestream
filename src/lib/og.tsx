@@ -97,8 +97,22 @@ export function OgCard({ kind, title, subtitle, meta, rating, imageUrl, imageSha
 
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 28 }}>
           {rating != null && rating > 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ display: 'flex', fontSize: 34, color: '#fbbf24' }}>★</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {/* Plain rounded chip instead of a star glyph — Satori's default font has
+                  no glyph for U+2605 and renders it as a missing-character box. */}
+              <div
+                style={{
+                  display: 'flex',
+                  fontSize: 18,
+                  fontWeight: 800,
+                  color: '#0b0f19',
+                  backgroundColor: '#fbbf24',
+                  borderRadius: 8,
+                  padding: '4px 10px',
+                }}
+              >
+                RATING
+              </div>
               <span style={{ display: 'flex', fontSize: 34, fontWeight: 800, color: '#fbbf24' }}>
                 {rating.toFixed(1)}
               </span>
