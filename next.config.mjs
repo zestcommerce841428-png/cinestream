@@ -18,6 +18,13 @@ const contentSecurityPolicy = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  // Caps static-generation worker parallelism. With 80+ pages each making their own TMDB
+  // request at build time, the default (CPU count - 1) workers can open enough simultaneous
+  // outbound connections to trip connection-reset limits on some networks; a lower, steadier
+  // concurrency is more reliable than a wide burst, and build time is not latency-sensitive.
+  experimental: {
+    cpus: 2,
+  },
   images: {
     remotePatterns: [
       {

@@ -138,6 +138,31 @@ export interface WatchProvider {
   display_priority: number;
 }
 
+const FETCH_RETRIES = 5;
+
+/**
+ * Retries network-level failures with a short backoff — including a reset while streaming
+ * the response body, which surfaces from `res.json()` rather than from `fetch()` itself, so
+ * the whole request+parse (not just the initial connection) has to be inside the retry loop
+ * to actually recover with a fresh connection.
+ */
+async function fetchJsonWithRetry<T>(url: string, revalidate: number, endpoint: string, retries = FETCH_RETRIES): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch(url, { next: { revalidate } });
+      if (!res.ok) {
+        // Definitive API answer, not a transient failure — don't retry.
+        throw new Error(`TMDB API Error: ${res.status} ${res.statusText} on ${endpoint}`);
+      }
+      return (await res.json()) as T;
+    } catch (err) {
+      const isHttpError = err instanceof Error && err.message.startsWith('TMDB API Error:');
+      if (isHttpError || attempt >= retries) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 400 * 2 ** attempt));
+    }
+  }
+}
+
 async function tmdbFetch<T>(endpoint: string, params: Record<string, string | number | boolean> = {}): Promise<T> {
   const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
   url.searchParams.append('api_key', assertApiKey());
@@ -149,11 +174,7 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
     }
   });
 
-  const res = await fetch(url.toString(), { next: { revalidate: 3600 } });
-  if (!res.ok) {
-    throw new Error(`TMDB API Error: ${res.status} ${res.statusText} on ${endpoint}`);
-  }
-  return res.json() as Promise<T>;
+  return fetchJsonWithRetry<T>(url.toString(), 3600, endpoint);
 }
 
 // -------------------------------------------------------------

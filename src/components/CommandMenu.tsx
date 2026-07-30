@@ -81,8 +81,17 @@ export default function CommandMenu({ isOpen, onClose }: { isOpen: boolean; onCl
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-      <div className="relative w-full max-w-2xl bg-gray-900 rounded-2xl overflow-hidden shadow-2xl border border-gray-800 space-y-3">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/80 backdrop-blur-md animate-fadeIn"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command palette"
+    >
+      <div
+        className="relative w-full max-w-2xl bg-gray-900 rounded-2xl overflow-hidden shadow-2xl border border-gray-800 space-y-3"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Search Input Bar */}
         <div className="flex items-center px-4 border-b border-gray-800">
           <Search className="w-5 h-5 text-gray-400 mr-3" />

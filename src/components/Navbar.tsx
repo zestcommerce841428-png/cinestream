@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Film, Search, Bookmark, Menu, X, Sparkles, UserCheck } from 'lucide-react';
 import { useWatchlist } from '@/context/WatchlistContext';
 
@@ -12,6 +13,13 @@ interface NavbarProps {
 export default function Navbar({ onOpenCommandPalette }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { watchlist } = useWatchlist();
+  const pathname = usePathname();
+
+  // The mobile dropdown previously stayed open after tapping a link — it only closed on
+  // the next manual toggle. Close it whenever the route actually changes.
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
 
   return (
     <header className="sticky top-0 z-40 w-full glass-nav backdrop-blur-xl border-b border-gray-800/80 bg-gray-950/80">
@@ -71,6 +79,8 @@ export default function Navbar({ onOpenCommandPalette }: NavbarProps) {
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="md:hidden p-2 rounded-xl text-gray-300 hover:text-white hover:bg-gray-900 border border-gray-800/80 transition"
               aria-label="Toggle Navigation"
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-nav-menu"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -80,7 +90,7 @@ export default function Navbar({ onOpenCommandPalette }: NavbarProps) {
 
       {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-gray-800 bg-gray-950 px-4 pt-3 pb-6 space-y-3 text-sm font-semibold text-gray-300">
+        <div id="mobile-nav-menu" className="md:hidden border-b border-gray-800 bg-gray-950 px-4 pt-3 pb-6 space-y-3 text-sm font-semibold text-gray-300">
           <Link href="/movies" className="block py-1.5 hover:text-white">Movies</Link>
           <Link href="/tv" className="block py-1.5 hover:text-white">TV Series</Link>
           <Link href="/trending" className="block py-1.5 hover:text-white">Trending</Link>
