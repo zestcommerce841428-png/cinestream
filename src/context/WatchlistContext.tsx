@@ -10,6 +10,7 @@ export interface WatchlistItem {
   release_date?: string;
   first_air_date?: string;
   type: 'movie' | 'tv';
+  tags?: string[];
 }
 
 interface WatchlistContextType {
@@ -17,6 +18,7 @@ interface WatchlistContextType {
   addToWatchlist: (item: WatchlistItem) => void;
   removeFromWatchlist: (id: number, type: 'movie' | 'tv') => void;
   isInWatchlist: (id: number, type: 'movie' | 'tv') => boolean;
+  setTags: (id: number, type: 'movie' | 'tv', tags: string[]) => void;
 }
 
 const WatchlistContext = createContext<WatchlistContextType>({
@@ -24,6 +26,7 @@ const WatchlistContext = createContext<WatchlistContextType>({
   addToWatchlist: () => {},
   removeFromWatchlist: () => {},
   isInWatchlist: () => false,
+  setTags: () => {},
 });
 
 const STORAGE_KEY = 'app_watchlist';
@@ -96,8 +99,12 @@ export const WatchlistProvider = ({ children }: { children: React.ReactNode }) =
     [watchlist]
   );
 
+  const setTags = useCallback((id: number, type: 'movie' | 'tv', tags: string[]) => {
+    writeStore(readStore().map((i) => (i.id === id && i.type === type ? { ...i, tags } : i)));
+  }, []);
+
   return (
-    <WatchlistContext.Provider value={{ watchlist, addToWatchlist, removeFromWatchlist, isInWatchlist }}>
+    <WatchlistContext.Provider value={{ watchlist, addToWatchlist, removeFromWatchlist, isInWatchlist, setTags }}>
       {children}
     </WatchlistContext.Provider>
   );

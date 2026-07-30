@@ -1,8 +1,9 @@
 import React from 'react';
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Award, ArrowLeft } from 'lucide-react';
+import { Award, ArrowLeft, Users } from 'lucide-react';
 import { tmdbClient, getImageUrl } from '@/services/tmdb';
 import { buildMetadata, truncateDescription } from '@/lib/metadata';
 
@@ -12,6 +13,42 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+interface Collaborator {
+  id: number;
+  name: string;
+  profile_path: string | null;
+  count: number;
+}
+
+async function getCollaborators(personId: number, credits: any[]): Promise<Collaborator[]> {
+  const topCredits = [...credits].sort((a, b) => (b.popularity || 0) - (a.popularity || 0)).slice(0, 12);
+
+  const castLists = await Promise.all(
+    topCredits.map(async (c) => {
+      try {
+        const creditsRes =
+          c.media_type === 'tv' ? await tmdbClient.getTVAggregateCredits(c.id) : await tmdbClient.getMovieCredits(c.id);
+        return (creditsRes.cast || []).slice(0, 15);
+      } catch {
+        return [] as any[];
+      }
+    })
+  );
+
+  const tally = new Map<number, Collaborator>();
+  castLists.flat().forEach((p: any) => {
+    if (p.id === personId) return;
+    const existing = tally.get(p.id);
+    if (existing) existing.count += 1;
+    else tally.set(p.id, { id: p.id, name: p.name, profile_path: p.profile_path, count: 1 });
+  });
+
+  return [...tally.values()]
+    .filter((c) => c.count >= 2)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+}
+
 async function getData(id: number) {
   try {
     const [person, creditsRes] = await Promise.all([
@@ -19,7 +56,8 @@ async function getData(id: number) {
       tmdbClient.getPersonCombinedCredits(id),
     ]);
     const credits: any[] = creditsRes.cast || creditsRes.crew || [];
-    return { person, credits };
+    const collaborators = await getCollaborators(id, credits);
+    return { person, credits, collaborators };
   } catch {
     return null;
   }
@@ -59,7 +97,7 @@ export default async function PersonAnalyticsPage({ params }: PageProps) {
     notFound();
   }
 
-  const { person, credits } = data;
+  const { person, credits, collaborators } = data;
   const avgRating = computeAvgRating(credits);
 
   return (
@@ -91,6 +129,29 @@ export default async function PersonAnalyticsPage({ params }: PageProps) {
           <p className="text-3xl font-extrabold text-brand-400">{person.popularity?.toFixed(0)}</p>
         </div>
       </div>
+
+      {collaborators.length > 0 && (
+        <div className="space-y-4 border-t border-gray-800 pt-8">
+          <div className="flex items-center space-x-2">
+            <Users className="w-6 h-6 text-brand-500" />
+            <h2 className="text-xl font-bold text-white">Frequent Collaborators</h2>
+          </div>
+          <p className="text-xs text-gray-500">
+            People who appeared alongside {person.name} in 2 or more of their most popular titles.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-4">
+            {collaborators.map((c) => (
+              <Link key={c.id} href={`/person/${c.id}`} className="group text-center space-y-1.5">
+                <div className="relative aspect-square w-full rounded-full overflow-hidden bg-gray-900 border border-gray-800 group-hover:border-brand-500/50 transition">
+                  <Image src={getImageUrl(c.profile_path, 'w185')} alt={c.name} fill className="object-cover" />
+                </div>
+                <p className="text-[11px] font-semibold text-gray-300 group-hover:text-white line-clamp-1">{c.name}</p>
+                <p className="text-[10px] text-brand-400">{c.count} titles together</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

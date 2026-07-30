@@ -1,5 +1,5 @@
 interface MediaGridSkeletonProps {
-  title?: string;
+  title?: string | boolean;
   count?: number;
 }
 

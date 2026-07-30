@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Film, Tv, Flame, Star, Calendar, User, Layers, Sparkles, Globe, Terminal, Bookmark, X, Command } from 'lucide-react';
+import { Search, Film, Tv, Flame, Star, Calendar, User, Layers, Sparkles, Globe, Terminal, Bookmark, X, Command, Gem, CalendarDays, TrendingDown, Users, Route, History, PlayCircle } from 'lucide-react';
 import { searchMultiAction } from '@/lib/actions';
 
 export default function CommandMenu({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
@@ -32,6 +32,23 @@ export default function CommandMenu({ isOpen, onClose }: { isOpen: boolean; onCl
     { name: 'Global Watch Providers', href: '/providers', icon: Globe },
     { name: 'TMDB Endpoints Playground', href: '/api-explorer', icon: Terminal },
     { name: 'Watchlist Manager', href: '/watchlist', icon: Bookmark },
+    { name: 'Hidden Gems', href: '/hidden-gems', icon: Gem },
+    { name: 'This Day in Film History', href: '/this-day', icon: CalendarDays },
+    { name: 'Most Anticipated Upcoming', href: '/most-anticipated', icon: Star },
+    { name: 'Longest & Shortest Movies', href: '/runtime-extremes', icon: Calendar },
+    { name: 'New This Week', href: '/new-this-week', icon: Sparkles },
+    { name: 'Underrated & Overrated', href: '/underrated-overrated', icon: Star },
+    { name: 'Remakes & Reboots', href: '/remakes-reboots', icon: Film },
+    { name: 'Based on a True Story', href: '/true-story', icon: Film },
+    { name: 'Based on Books', href: '/based-on-books', icon: Film },
+    { name: 'Biggest Box Office Flops', href: '/box-office-flops', icon: TrendingDown },
+    { name: 'Six Degrees of Separation', href: '/six-degrees', icon: Users },
+    { name: 'Franchise Viewing Order Guides', href: '/franchise-guides', icon: Route },
+    { name: 'Sequel Tracker', href: '/sequel-tracker', icon: Layers },
+    { name: 'Directorial Debuts', href: '/directorial-debuts', icon: Film },
+    { name: 'Viewing History', href: '/history', icon: History },
+    { name: 'Continue Watching', href: '/continue-watching', icon: PlayCircle },
+    { name: 'My Ratings', href: '/my-ratings', icon: Star },
   ];
 
   useEffect(() => {

@@ -10,6 +10,8 @@ import { buildMetadata, truncateDescription } from '@/lib/metadata';
 import { jsonLdScriptProps, movieJsonLd, breadcrumbJsonLd } from '@/lib/jsonld';
 import { getPreferredLanguage } from '@/lib/i18n-server';
 import WatchlistButton from '@/components/WatchlistButton';
+import WatchedButton from '@/components/WatchedButton';
+import RatingWidget from '@/components/RatingWidget';
 import CrossSourceRatings from '@/components/CrossSourceRatings';
 
 // No `revalidate` export: reading the language cookie makes this route inherently
@@ -153,6 +155,11 @@ export default async function MovieDetailsPage({ params }: MoviePageProps) {
 
             {movie.crossSourceRatings && <CrossSourceRatings ratings={movie.crossSourceRatings} />}
 
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Your rating:</span>
+              <RatingWidget item={{ id: movie.id, type: 'movie', title: movie.title, poster_path: movie.poster_path }} />
+            </div>
+
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <WatchlistButton
                 variant="button"
@@ -164,6 +171,10 @@ export default async function MovieDetailsPage({ params }: MoviePageProps) {
                   release_date: movie.release_date,
                   type: 'movie',
                 }}
+              />
+
+              <WatchedButton
+                movie={{ id: movie.id, title: movie.title, poster_path: movie.poster_path, runtime: movie.runtime }}
               />
 
               {trailer && (

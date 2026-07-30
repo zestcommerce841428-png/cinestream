@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { Globe } from 'lucide-react';
 import { tmdbClient } from '@/services/tmdb';
 import { buildMetadata } from '@/lib/metadata';
@@ -26,10 +27,14 @@ export default async function CountriesCatalogPage() {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {countries.map((c: any, idx: number) => (
-          <div key={idx} className="bg-gray-900/60 p-3.5 rounded-xl border border-gray-800 flex items-center justify-between">
+          <Link
+            key={idx}
+            href={`/country/${c.iso_3166_1}`}
+            className="bg-gray-900/60 p-3.5 rounded-xl border border-gray-800 hover:border-brand-500/50 flex items-center justify-between transition"
+          >
             <span className="font-bold text-xs text-white truncate max-w-[120px]">{c.english_name}</span>
             <span className="text-[10px] font-mono uppercase bg-gray-950 px-2 py-0.5 rounded text-brand-400 border border-gray-800">{c.iso_3166_1}</span>
-          </div>
+          </Link>
         ))}
       </div>
     </div>

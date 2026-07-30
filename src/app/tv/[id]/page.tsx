@@ -10,6 +10,7 @@ import { buildMetadata, truncateDescription } from '@/lib/metadata';
 import { jsonLdScriptProps, tvSeriesJsonLd, breadcrumbJsonLd } from '@/lib/jsonld';
 import { getPreferredLanguage } from '@/lib/i18n-server';
 import WatchlistButton from '@/components/WatchlistButton';
+import RatingWidget from '@/components/RatingWidget';
 import CrossSourceRatings from '@/components/CrossSourceRatings';
 
 // No `revalidate` export: reading the language cookie makes this route inherently
@@ -140,6 +141,11 @@ export default async function TVDetailsPage({ params }: TVPageProps) {
             </div>
 
             {tv.crossSourceRatings && <CrossSourceRatings ratings={tv.crossSourceRatings} />}
+
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Your rating:</span>
+              <RatingWidget item={{ id: tv.id, type: 'tv', title: tv.name, poster_path: tv.poster_path }} />
+            </div>
 
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <WatchlistButton

@@ -3,6 +3,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import AppChrome from '@/components/AppChrome';
 import { WatchlistProvider } from '@/context/WatchlistContext';
+import { WatchHistoryProvider } from '@/context/WatchHistoryContext';
+import { RatingsProvider } from '@/context/RatingsContext';
 import { SITE_NAME, SITE_URL, SITE_DESCRIPTION } from '@/lib/metadata';
 
 export const metadata: Metadata = {
@@ -60,7 +62,11 @@ export default function RootLayout({
     <html lang="en">
       <body className="bg-dark-900 text-gray-100 min-h-screen flex flex-col antialiased">
         <WatchlistProvider>
-          <AppChrome>{children}</AppChrome>
+          <WatchHistoryProvider>
+            <RatingsProvider>
+              <AppChrome>{children}</AppChrome>
+            </RatingsProvider>
+          </WatchHistoryProvider>
         </WatchlistProvider>
       </body>
     </html>

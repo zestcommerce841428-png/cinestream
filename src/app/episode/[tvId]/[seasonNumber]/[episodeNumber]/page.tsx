@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 import { getImageUrl } from '@/services/tmdb';
 import { tmdbClient } from '@/services/tmdb';
 import { buildMetadata, truncateDescription } from '@/lib/metadata';
+import EpisodeWatchedButton from '@/components/EpisodeWatchedButton';
 
 export const revalidate = 3600;
 
@@ -15,7 +16,11 @@ interface PageProps {
 
 async function getEpisode(tvId: number, seasonNumber: number, episodeNumber: number) {
   try {
-    return await tmdbClient.getTVEpisodeDetailsDeep(tvId, seasonNumber, episodeNumber);
+    const [episode, show] = await Promise.all([
+      tmdbClient.getTVEpisodeDetailsDeep(tvId, seasonNumber, episodeNumber),
+      tmdbClient.getTVDetails(tvId).catch(() => null),
+    ]);
+    return { episode, show };
   } catch {
     return null;
   }
@@ -23,14 +28,14 @@ async function getEpisode(tvId: number, seasonNumber: number, episodeNumber: num
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { tvId, seasonNumber, episodeNumber } = await params;
-  const episode = await getEpisode(parseInt(tvId, 10), parseInt(seasonNumber, 10), parseInt(episodeNumber, 10));
-  if (!episode) return { title: 'Episode Not Found', robots: { index: false, follow: false } };
+  const data = await getEpisode(parseInt(tvId, 10), parseInt(seasonNumber, 10), parseInt(episodeNumber, 10));
+  if (!data?.episode) return { title: 'Episode Not Found', robots: { index: false, follow: false } };
 
   return buildMetadata({
-    title: `S${seasonNumber}E${episodeNumber} — ${episode.name}`,
-    description: truncateDescription(episode.overview || `Episode ${episodeNumber} of season ${seasonNumber}.`),
+    title: `S${seasonNumber}E${episodeNumber} — ${data.episode.name}`,
+    description: truncateDescription(data.episode.overview || `Episode ${episodeNumber} of season ${seasonNumber}.`),
     path: `/episode/${tvId}/${seasonNumber}/${episodeNumber}`,
-    image: episode.still_path ? getImageUrl(episode.still_path, 'w780') : null,
+    image: data.episode.still_path ? getImageUrl(data.episode.still_path, 'w780') : null,
   });
 }
 
@@ -39,11 +44,13 @@ export default async function EpisodePage({ params }: PageProps) {
   const tvIdNum = parseInt(tvId, 10);
   const seasonNum = parseInt(seasonNumber, 10);
   const epNum = parseInt(episodeNumber, 10);
-  const episode = await getEpisode(tvIdNum, seasonNum, epNum);
+  const data = await getEpisode(tvIdNum, seasonNum, epNum);
 
-  if (!episode) {
+  if (!data?.episode) {
     notFound();
   }
+
+  const { episode, show } = data;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
@@ -74,6 +81,19 @@ export default async function EpisodePage({ params }: PageProps) {
           {episode.air_date && <span>Air Date: {episode.air_date}</span>}
           {episode.runtime > 0 && <span>Runtime: {episode.runtime} mins</span>}
           {episode.vote_average > 0 && <span>Rating: ⭐ {episode.vote_average.toFixed(1)}</span>}
+        </div>
+        <div className="pt-2">
+          <EpisodeWatchedButton
+            episode={{
+              tvId: tvIdNum,
+              showTitle: show?.name || `TV Show ${tvIdNum}`,
+              poster_path: show?.poster_path ?? null,
+              seasonNumber: seasonNum,
+              episodeNumber: epNum,
+              episodeName: episode.name,
+              episodeRuntime: episode.runtime || undefined,
+            }}
+          />
         </div>
       </div>
 
