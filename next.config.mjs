@@ -23,7 +23,7 @@ const nextConfig = {
   // outbound connections to trip connection-reset limits on some networks; a lower, steadier
   // concurrency is more reliable than a wide burst, and build time is not latency-sensitive.
   experimental: {
-    cpus: 2,
+    cpus: 4,
   },
   images: {
     remotePatterns: [

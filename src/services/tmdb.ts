@@ -138,7 +138,7 @@ export interface WatchProvider {
   display_priority: number;
 }
 
-const FETCH_RETRIES = 5;
+const FETCH_RETRIES = 7;
 
 /**
  * Retries network-level failures with a short backoff — including a reset while streaming
@@ -158,7 +158,7 @@ async function fetchJsonWithRetry<T>(url: string, revalidate: number, endpoint: 
     } catch (err) {
       const isHttpError = err instanceof Error && err.message.startsWith('TMDB API Error:');
       if (isHttpError || attempt >= retries) throw err;
-      await new Promise((resolve) => setTimeout(resolve, 400 * 2 ** attempt));
+      await new Promise((resolve) => setTimeout(resolve, Math.min(400 * 2 ** attempt, 4000)));
     }
   }
 }
