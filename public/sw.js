@@ -3,10 +3,17 @@
 //  1. TMDB poster/backdrop images: stale-while-revalidate, capped cache size.
 //  2. Next.js immutable build assets (/_next/static/*): cache-first.
 //  3. Page navigations: network-first, falling back to the cached shell or offline.html.
-const CACHE_VERSION = 'cinestream-v1';
+// v2: bumps the cache name so `activate` purges any stale v1 cache — see the note on
+// `PRECACHE_URLS` below for why a stale '/' snapshot could otherwise stick around.
+const CACHE_VERSION = 'cinestream-v2';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const IMAGE_CACHE = `${CACHE_VERSION}-images`;
-const PRECACHE_URLS = ['/', '/watchlist', '/manifest.json', '/favicon.ico', '/logo192.png', '/logo512.png', '/offline.html'];
+// Deliberately excludes '/' and '/watchlist': precaching a page at install time caches
+// whatever HTML happened to be live at that exact moment with no way to revalidate it
+// until the SW itself updates, which risks pinning a visitor to a stale snapshot. Static,
+// truly-immutable assets are safe to precache; real pages are left to the network-first
+// navigate handler below, which caches only successful, fresh responses as they're seen.
+const PRECACHE_URLS = ['/manifest.json', '/favicon.ico', '/logo192.png', '/logo512.png', '/offline.html'];
 const MAX_IMAGE_ENTRIES = 150;
 
 self.addEventListener('install', (event) => {
@@ -85,7 +92,12 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          caches.open(STATIC_CACHE).then((cache) => cache.put(request, response.clone()));
+          // Only cache genuinely successful pages — caching a transient 500 (or any
+          // non-2xx) would otherwise pin future offline/fallback visits to that broken
+          // response until it happens to be overwritten by a later successful one.
+          if (response.ok) {
+            caches.open(STATIC_CACHE).then((cache) => cache.put(request, response.clone()));
+          }
           return response;
         })
         .catch(async () => {
