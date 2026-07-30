@@ -163,12 +163,15 @@ async function fetchJsonWithRetry<T>(url: string, revalidate: number, endpoint: 
   }
 }
 
-async function tmdbFetch<T>(endpoint: string, params: Record<string, string | number | boolean> = {}): Promise<T> {
+async function tmdbFetch<T>(endpoint: string, params: Record<string, string | number | boolean | undefined> = {}): Promise<T> {
   const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
   url.searchParams.append('api_key', assertApiKey());
-  url.searchParams.append('language', 'en-US');
 
-  Object.entries(params).forEach(([key, val]) => {
+  // `language` defaults to en-US but can be overridden per-call (see the `language?`
+  // param on select tmdbClient methods) — merged before the loop so an explicit value
+  // in `params` cleanly replaces the default instead of appending a duplicate key.
+  const merged = { language: 'en-US', ...params };
+  Object.entries(merged).forEach(([key, val]) => {
     if (val !== undefined && val !== null && val !== '') {
       url.searchParams.append(key, String(val));
     }
@@ -183,12 +186,12 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string | nu
 
 export const tmdbClient = {
   // --- MOVIES (55 Endpoints) ---
-  getMoviePopular: (page = 1) => tmdbFetch<TMDBResponse<Movie>>('/movie/popular', { page }),
-  getMovieNowPlaying: (page = 1) => tmdbFetch<TMDBResponse<Movie>>('/movie/now_playing', { page }),
-  getMovieTopRated: (page = 1) => tmdbFetch<TMDBResponse<Movie>>('/movie/top_rated', { page }),
-  getMovieUpcoming: (page = 1) => tmdbFetch<TMDBResponse<Movie>>('/movie/upcoming', { page }),
-  getMovieDetails: (id: number) => tmdbFetch<any>(`/movie/${id}`),
-  getMovieDetailsDeep: (id: number) => tmdbFetch<any>(`/movie/${id}`, { append_to_response: 'credits,videos,images,recommendations,similar,reviews,keywords,watch/providers,release_dates,external_ids' }),
+  getMoviePopular: (page = 1, language?: string) => tmdbFetch<TMDBResponse<Movie>>('/movie/popular', { page, language }),
+  getMovieNowPlaying: (page = 1, language?: string) => tmdbFetch<TMDBResponse<Movie>>('/movie/now_playing', { page, language }),
+  getMovieTopRated: (page = 1, language?: string) => tmdbFetch<TMDBResponse<Movie>>('/movie/top_rated', { page, language }),
+  getMovieUpcoming: (page = 1, language?: string) => tmdbFetch<TMDBResponse<Movie>>('/movie/upcoming', { page, language }),
+  getMovieDetails: (id: number, language?: string) => tmdbFetch<any>(`/movie/${id}`, { language }),
+  getMovieDetailsDeep: (id: number, language?: string) => tmdbFetch<any>(`/movie/${id}`, { append_to_response: 'credits,videos,images,recommendations,similar,reviews,keywords,watch/providers,release_dates,external_ids', language }),
   getMovieAlternativeTitles: (id: number) => tmdbFetch<any>(`/movie/${id}/alternative_titles`),
   getMovieChanges: (id: number) => tmdbFetch<any>(`/movie/${id}/changes`),
   getMovieCredits: (id: number) => tmdbFetch<{ id: number; cast: CastMember[]; crew: CrewMember[] }>(`/movie/${id}/credits`),
@@ -223,12 +226,12 @@ export const tmdbClient = {
   getDirectorMovies: (personId = 525, page = 1) => tmdbFetch<TMDBResponse<Movie>>('/discover/movie', { with_crew: personId, page }),
 
   // --- TV SHOWS (30 Endpoints) ---
-  getTVPopular: (page = 1) => tmdbFetch<TMDBResponse<TVShow>>('/tv/popular', { page }),
-  getTVTopRated: (page = 1) => tmdbFetch<TMDBResponse<TVShow>>('/tv/top_rated', { page }),
-  getTVOnTheAir: (page = 1) => tmdbFetch<TMDBResponse<TVShow>>('/tv/on_the_air', { page }),
-  getTVAiringToday: (page = 1) => tmdbFetch<TMDBResponse<TVShow>>('/tv/airing_today', { page }),
-  getTVDetails: (id: number) => tmdbFetch<any>(`/tv/${id}`),
-  getTVDetailsDeep: (id: number) => tmdbFetch<any>(`/tv/${id}`, { append_to_response: 'aggregate_credits,credits,videos,images,recommendations,similar,reviews,keywords,watch/providers,content_ratings,external_ids' }),
+  getTVPopular: (page = 1, language?: string) => tmdbFetch<TMDBResponse<TVShow>>('/tv/popular', { page, language }),
+  getTVTopRated: (page = 1, language?: string) => tmdbFetch<TMDBResponse<TVShow>>('/tv/top_rated', { page, language }),
+  getTVOnTheAir: (page = 1, language?: string) => tmdbFetch<TMDBResponse<TVShow>>('/tv/on_the_air', { page, language }),
+  getTVAiringToday: (page = 1, language?: string) => tmdbFetch<TMDBResponse<TVShow>>('/tv/airing_today', { page, language }),
+  getTVDetails: (id: number, language?: string) => tmdbFetch<any>(`/tv/${id}`, { language }),
+  getTVDetailsDeep: (id: number, language?: string) => tmdbFetch<any>(`/tv/${id}`, { append_to_response: 'aggregate_credits,credits,videos,images,recommendations,similar,reviews,keywords,watch/providers,content_ratings,external_ids', language }),
   getTVAggregateCredits: (id: number) => tmdbFetch<any>(`/tv/${id}/aggregate_credits`),
   getTVAlternativeTitles: (id: number) => tmdbFetch<any>(`/tv/${id}/alternative_titles`),
   getTVChanges: (id: number) => tmdbFetch<any>(`/tv/${id}/changes`),
@@ -297,7 +300,7 @@ export const tmdbClient = {
   getPopularKeywordsList: (query = 'action', page = 1) => tmdbFetch<TMDBResponse<any>>('/search/keyword', { query, page }),
 
   // --- TRENDING & DISCOVER (12 Endpoints) ---
-  getTrendingAllDay: () => tmdbFetch<TMDBResponse<any>>('/trending/all/day'),
+  getTrendingAllDay: (language?: string) => tmdbFetch<TMDBResponse<any>>('/trending/all/day', { language }),
   getTrendingAllWeek: () => tmdbFetch<TMDBResponse<any>>('/trending/all/week'),
   getTrendingMoviesDay: () => tmdbFetch<TMDBResponse<Movie>>('/trending/movie/day'),
   getTrendingMoviesWeek: () => tmdbFetch<TMDBResponse<Movie>>('/trending/movie/week'),
@@ -311,11 +314,11 @@ export const tmdbClient = {
   discoverByYear: (year: number, type: 'movie' | 'tv' = 'movie', page = 1) => tmdbFetch<TMDBResponse<any>>(`/discover/${type}`, { [type === 'movie' ? 'primary_release_year' : 'first_air_date_year']: year, page }),
 
   // --- PEOPLE / ACTORS (10 Endpoints) ---
-  getPersonDetails: (id: number) => tmdbFetch<any>(`/person/${id}`),
+  getPersonDetails: (id: number, language?: string) => tmdbFetch<any>(`/person/${id}`, { language }),
   getPopularPeople: (page = 1) => tmdbFetch<TMDBResponse<Person>>('/person/popular', { page }),
   getPersonMovieCredits: (id: number) => tmdbFetch<any>(`/person/${id}/movie_credits`),
   getPersonTVCredits: (id: number) => tmdbFetch<any>(`/person/${id}/tv_credits`),
-  getPersonCombinedCredits: (id: number) => tmdbFetch<any>(`/person/${id}/combined_credits`),
+  getPersonCombinedCredits: (id: number, language?: string) => tmdbFetch<any>(`/person/${id}/combined_credits`, { language }),
   getPersonExternalIDs: (id: number) => tmdbFetch<any>(`/person/${id}/external_ids`),
   getPersonImages: (id: number) => tmdbFetch<any>(`/person/${id}/images`),
   getPersonTaggedImages: (id: number, page = 1) => tmdbFetch<any>(`/person/${id}/tagged_images`, { page }),
@@ -323,9 +326,9 @@ export const tmdbClient = {
   getPersonChanges: (id: number) => tmdbFetch<any>(`/person/${id}/changes`),
 
   // --- SEARCH (8 Endpoints) ---
-  searchMulti: (query: string, page = 1) => tmdbFetch<TMDBResponse<any>>('/search/multi', { query, page }),
-  searchMovies: (query: string, page = 1) => tmdbFetch<TMDBResponse<Movie>>('/search/movie', { query, page }),
-  searchTV: (query: string, page = 1) => tmdbFetch<TMDBResponse<TVShow>>('/search/tv', { query, page }),
+  searchMulti: (query: string, page = 1, language?: string) => tmdbFetch<TMDBResponse<any>>('/search/multi', { query, page, language }),
+  searchMovies: (query: string, page = 1, language?: string) => tmdbFetch<TMDBResponse<Movie>>('/search/movie', { query, page, language }),
+  searchTV: (query: string, page = 1, language?: string) => tmdbFetch<TMDBResponse<TVShow>>('/search/tv', { query, page, language }),
   searchPeople: (query: string, page = 1) => tmdbFetch<TMDBResponse<Person>>('/search/person', { query, page }),
   searchCollections: (query: string, page = 1) => tmdbFetch<TMDBResponse<any>>('/search/collection', { query, page }),
   searchKeywords: (query: string, page = 1) => tmdbFetch<TMDBResponse<any>>('/search/keyword', { query, page }),
@@ -341,8 +344,8 @@ export const tmdbClient = {
   getMovieWatchProvidersDetails: (id: number) => tmdbFetch<any>(`/movie/${id}/watch/providers`),
 
   // --- GENRES, CERTIFICATIONS & CONFIGURATION (15 Endpoints) ---
-  getMovieGenres: () => tmdbFetch<{ genres: Genre[] }>('/genre/movie/list'),
-  getTVGenres: () => tmdbFetch<{ genres: Genre[] }>('/genre/tv/list'),
+  getMovieGenres: (language?: string) => tmdbFetch<{ genres: Genre[] }>('/genre/movie/list', { language }),
+  getTVGenres: (language?: string) => tmdbFetch<{ genres: Genre[] }>('/genre/tv/list', { language }),
   getMovieCertifications: () => tmdbFetch<any>('/certification/movie/list'),
   getTVCertifications: () => tmdbFetch<any>('/certification/tv/list'),
   getConfiguration: () => tmdbFetch<any>('/configuration'),

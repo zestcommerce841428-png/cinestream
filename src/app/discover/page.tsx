@@ -4,8 +4,10 @@ import { tmdbClient } from '@/services/tmdb';
 import MovieCard from '@/components/MovieCard';
 import DiscoverFilters from '@/components/DiscoverFilters';
 import { buildMetadata } from '@/lib/metadata';
+import { getPreferredLanguage } from '@/lib/i18n-server';
 
-export const revalidate = 3600;
+// No `revalidate` export: reading the language cookie makes this route inherently
+// per-request (see src/lib/i18n-server.ts) — a static ISR interval would be misleading.
 
 interface DiscoverPageProps {
   searchParams: Promise<{ type?: string; genre?: string; year?: string; sort?: string; rating?: string; provider?: string; region?: string }>;
@@ -34,11 +36,13 @@ export default async function DiscoverPage({ searchParams }: DiscoverPageProps) 
   const provider = sp.provider || '';
   const region = sp.region || 'US';
 
-  const genresRes = await (type === 'movie' ? tmdbClient.getMovieGenres() : tmdbClient.getTVGenres());
+  const language = await getPreferredLanguage();
+  const genresRes = await (type === 'movie' ? tmdbClient.getMovieGenres(language) : tmdbClient.getTVGenres(language));
 
   const params: Record<string, string | number> = {
     sort_by: sort,
     'vote_average.gte': rating,
+    language,
   };
   if (genre) params.with_genres = genre;
   if (year) {

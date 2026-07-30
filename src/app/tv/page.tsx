@@ -4,8 +4,10 @@ import { Tv, ChevronLeft, ChevronRight } from 'lucide-react';
 import { tmdbClient } from '@/services/tmdb';
 import MovieCard from '@/components/MovieCard';
 import { buildMetadata } from '@/lib/metadata';
+import { getPreferredLanguage } from '@/lib/i18n-server';
 
-export const revalidate = 3600;
+// No `revalidate` export: reading the language cookie makes this route inherently
+// per-request (see src/lib/i18n-server.ts) — a static ISR interval would be misleading.
 
 const CATEGORIES = [
   { id: 'popular', label: 'Popular' },
@@ -16,16 +18,16 @@ const CATEGORIES = [
 
 type CategoryKey = (typeof CATEGORIES)[number]['id'];
 
-function fetchTV(category: CategoryKey, page: number) {
+function fetchTV(category: CategoryKey, page: number, language: string) {
   switch (category) {
     case 'top_rated':
-      return tmdbClient.getTVTopRated(page);
+      return tmdbClient.getTVTopRated(page, language);
     case 'on_the_air':
-      return tmdbClient.getTVOnTheAir(page);
+      return tmdbClient.getTVOnTheAir(page, language);
     case 'airing_today':
-      return tmdbClient.getTVAiringToday(page);
+      return tmdbClient.getTVAiringToday(page, language);
     default:
-      return tmdbClient.getTVPopular(page);
+      return tmdbClient.getTVPopular(page, language);
   }
 }
 
@@ -52,8 +54,9 @@ export default async function TVPage({ searchParams }: TVPageProps) {
   const { category: rawCategory, page: rawPage } = await searchParams;
   const category = resolveCategory(rawCategory);
   const page = Math.min(Math.max(parseInt(rawPage || '1', 10) || 1, 1), 500);
+  const language = await getPreferredLanguage();
 
-  const res = await fetchTV(category, page);
+  const res = await fetchTV(category, page, language);
   const shows = res.results || [];
   const totalPages = Math.min(res.total_pages || 1, 500);
 

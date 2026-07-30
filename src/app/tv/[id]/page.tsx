@@ -5,11 +5,15 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Star, Calendar, Share2, Tv, Film, Sparkles, MessageSquare, Languages, ExternalLink, ShieldAlert, Layers } from 'lucide-react';
 import { tmdbClient, getImageUrl, getBackdropUrl } from '@/services/tmdb';
+import { getCrossSourceRatings } from '@/services/omdb';
 import { buildMetadata, truncateDescription } from '@/lib/metadata';
 import { jsonLdScriptProps, tvSeriesJsonLd, breadcrumbJsonLd } from '@/lib/jsonld';
+import { getPreferredLanguage } from '@/lib/i18n-server';
 import WatchlistButton from '@/components/WatchlistButton';
+import CrossSourceRatings from '@/components/CrossSourceRatings';
 
-export const revalidate = 3600;
+// No `revalidate` export: reading the language cookie makes this route inherently
+// per-request (see src/lib/i18n-server.ts) — a static ISR interval would be misleading.
 
 interface TVPageProps {
   params: Promise<{ id: string }>;
@@ -17,7 +21,10 @@ interface TVPageProps {
 
 async function getTV(id: number) {
   try {
-    return await tmdbClient.getTVDetailsDeep(id);
+    const language = await getPreferredLanguage();
+    const tv = await tmdbClient.getTVDetailsDeep(id, language);
+    const crossSourceRatings = await getCrossSourceRatings(tv.external_ids?.imdb_id);
+    return { ...tv, crossSourceRatings };
   } catch {
     return null;
   }
@@ -35,7 +42,8 @@ export async function generateMetadata({ params }: TVPageProps): Promise<Metadat
     title: `${tv.name}${year}`,
     description: truncateDescription(tv.overview),
     path: `/tv/${tv.id}`,
-    image: tv.poster_path ? getImageUrl(tv.poster_path, 'w780') : tv.backdrop_path ? getBackdropUrl(tv.backdrop_path, 'w1280') : null,
+    // No `image` here: this route has an opengraph-image.tsx that generates a dynamic
+    // poster+rating card, and Next.js wires that up as the OG/Twitter image automatically.
     type: 'video.tv_show',
   });
 }
@@ -130,6 +138,8 @@ export default async function TVDetailsPage({ params }: TVPageProps) {
                 </div>
               )}
             </div>
+
+            {tv.crossSourceRatings && <CrossSourceRatings ratings={tv.crossSourceRatings} />}
 
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <WatchlistButton

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import CommandMenu from '@/components/CommandMenu';
+import PwaManager from '@/components/PwaManager';
 
 export default function AppChrome({ children }: { children: React.ReactNode }) {
   const [commandOpen, setCommandOpen] = useState(false);
@@ -28,6 +29,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
       </main>
       <Footer />
       <CommandMenu isOpen={commandOpen} onClose={() => setCommandOpen(false)} />
+      <PwaManager />
     </>
   );
 }

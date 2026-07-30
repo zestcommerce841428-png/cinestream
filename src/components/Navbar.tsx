@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Film, Search, Bookmark, Menu, X, Sparkles, UserCheck } from 'lucide-react';
 import { useWatchlist } from '@/context/WatchlistContext';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 
 interface NavbarProps {
   onOpenCommandPalette?: () => void;
@@ -14,12 +15,16 @@ export default function Navbar({ onOpenCommandPalette }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { watchlist } = useWatchlist();
   const pathname = usePathname();
+  const [prevPathname, setPrevPathname] = useState(pathname);
 
   // The mobile dropdown previously stayed open after tapping a link — it only closed on
-  // the next manual toggle. Close it whenever the route actually changes.
-  useEffect(() => {
+  // the next manual toggle. Adjusting state during render (rather than in an effect)
+  // avoids an extra post-commit render pass for this "reset on prop change" pattern —
+  // see https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
     setMobileMenuOpen(false);
-  }, [pathname]);
+  }
 
   return (
     <header className="sticky top-0 z-40 w-full glass-nav backdrop-blur-xl border-b border-gray-800/80 bg-gray-950/80">
@@ -53,6 +58,8 @@ export default function Navbar({ onOpenCommandPalette }: NavbarProps) {
 
           {/* Actions */}
           <div className="flex items-center space-x-3">
+            <LanguageSwitcher />
+
             <button
               onClick={onOpenCommandPalette}
               className="p-2 rounded-xl text-gray-300 hover:text-white hover:bg-gray-900 border border-gray-800/80 transition"

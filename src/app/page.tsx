@@ -5,15 +5,20 @@ import { Info, Flame, Film, Tv, Sparkles, Clapperboard, Star } from 'lucide-reac
 import { tmdbClient, getBackdropUrl, Movie, Video } from '@/services/tmdb';
 import MediaCarousel from '@/components/MediaCarousel';
 import HeroTrailerButton from '@/components/HeroTrailerButton';
+import ForYouRow from '@/components/ForYouRow';
 import { SITE_NAME, truncateDescription } from '@/lib/metadata';
 import { jsonLdScriptProps, websiteJsonLd } from '@/lib/jsonld';
+import { getPreferredLanguage } from '@/lib/i18n-server';
 
-export const revalidate = 3600;
+// No `revalidate` export here: reading the language cookie (a Next.js "dynamic API")
+// already opts this route into per-request rendering, so a static ISR interval would
+// be misleading — see src/lib/i18n-server.ts.
 
 const HOME_TITLE = `${SITE_NAME} — Discover Movies & TV Shows`;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const trending = await tmdbClient.getTrendingAllDay().catch(() => null);
+  const language = await getPreferredLanguage();
+  const trending = await tmdbClient.getTrendingAllDay(language).catch(() => null);
   const hero = trending?.results?.[0] as (Movie & { name?: string; media_type?: string }) | undefined;
   const heroTitle = hero?.title || hero?.name;
   const description = heroTitle
@@ -41,12 +46,13 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
+  const language = await getPreferredLanguage();
   const [trendingRes, nowPlayingRes, topRatedTvRes, popularRes, genresRes] = await Promise.all([
-    tmdbClient.getTrendingAllDay(),
-    tmdbClient.getMovieNowPlaying(),
-    tmdbClient.getTVTopRated(),
-    tmdbClient.getMoviePopular(),
-    tmdbClient.getMovieGenres(),
+    tmdbClient.getTrendingAllDay(language),
+    tmdbClient.getMovieNowPlaying(1, language),
+    tmdbClient.getTVTopRated(1, language),
+    tmdbClient.getMoviePopular(1, language),
+    tmdbClient.getMovieGenres(language),
   ]);
 
   const heroMovie = trendingRes.results[0] as (Movie & { name?: string; media_type?: string }) | undefined;
@@ -123,6 +129,9 @@ export default async function HomePage() {
 
       {/* Main Container for Carousels */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+        {/* Personalized feed — client island, only renders once a watchlist exists */}
+        <ForYouRow />
+
         {/* Genre Quick Filters */}
         <section className="space-y-3">
           <div className="flex items-center space-x-2 text-gray-300 font-semibold text-sm">

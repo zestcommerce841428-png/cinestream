@@ -69,6 +69,21 @@ const nextConfig = {
           },
         ],
       },
+      {
+        // Service worker scripts must never be served stale — an old cached /sw.js can
+        // pin a user to an outdated caching strategy indefinitely.
+        source: '/sw.js',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
+          },
+          {
+            key: 'Service-Worker-Allowed',
+            value: '/',
+          },
+        ],
+      },
     ];
   },
 };

@@ -5,11 +5,15 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Star, Clock, Calendar, Share2, Film, Sparkles, MessageSquare, Tv, Languages, ExternalLink, History } from 'lucide-react';
 import { tmdbClient, getImageUrl, getBackdropUrl } from '@/services/tmdb';
+import { getCrossSourceRatings } from '@/services/omdb';
 import { buildMetadata, truncateDescription } from '@/lib/metadata';
 import { jsonLdScriptProps, movieJsonLd, breadcrumbJsonLd } from '@/lib/jsonld';
+import { getPreferredLanguage } from '@/lib/i18n-server';
 import WatchlistButton from '@/components/WatchlistButton';
+import CrossSourceRatings from '@/components/CrossSourceRatings';
 
-export const revalidate = 3600;
+// No `revalidate` export: reading the language cookie makes this route inherently
+// per-request (see src/lib/i18n-server.ts) — a static ISR interval would be misleading.
 
 interface MoviePageProps {
   params: Promise<{ id: string }>;
@@ -17,7 +21,10 @@ interface MoviePageProps {
 
 async function getMovie(id: number) {
   try {
-    return await tmdbClient.getMovieDetailsDeep(id);
+    const language = await getPreferredLanguage();
+    const movie = await tmdbClient.getMovieDetailsDeep(id, language);
+    const crossSourceRatings = await getCrossSourceRatings(movie.imdb_id);
+    return { ...movie, crossSourceRatings };
   } catch {
     return null;
   }
@@ -35,7 +42,8 @@ export async function generateMetadata({ params }: MoviePageProps): Promise<Meta
     title: `${movie.title}${year}`,
     description: truncateDescription(movie.overview),
     path: `/movie/${movie.id}`,
-    image: movie.poster_path ? getImageUrl(movie.poster_path, 'w780') : movie.backdrop_path ? getBackdropUrl(movie.backdrop_path, 'w1280') : null,
+    // No `image` here: this route has an opengraph-image.tsx that generates a dynamic
+    // poster+rating card, and Next.js wires that up as the OG/Twitter image automatically.
     type: 'video.movie',
   });
 }
@@ -142,6 +150,8 @@ export default async function MovieDetailsPage({ params }: MoviePageProps) {
                 </div>
               )}
             </div>
+
+            {movie.crossSourceRatings && <CrossSourceRatings ratings={movie.crossSourceRatings} />}
 
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <WatchlistButton

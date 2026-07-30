@@ -7,8 +7,10 @@ import { tmdbClient, getImageUrl } from '@/services/tmdb';
 import MovieCard from '@/components/MovieCard';
 import { buildMetadata, truncateDescription } from '@/lib/metadata';
 import { jsonLdScriptProps, personJsonLd, breadcrumbJsonLd } from '@/lib/jsonld';
+import { getPreferredLanguage } from '@/lib/i18n-server';
 
-export const revalidate = 3600;
+// No `revalidate` export: reading the language cookie makes this route inherently
+// per-request (see src/lib/i18n-server.ts) — a static ISR interval would be misleading.
 
 interface PersonPageProps {
   params: Promise<{ id: string }>;
@@ -16,9 +18,10 @@ interface PersonPageProps {
 
 async function getPerson(id: number) {
   try {
+    const language = await getPreferredLanguage();
     const [person, creditsRes] = await Promise.all([
-      tmdbClient.getPersonDetails(id),
-      tmdbClient.getPersonCombinedCredits(id).catch(() => ({ cast: [] })),
+      tmdbClient.getPersonDetails(id, language),
+      tmdbClient.getPersonCombinedCredits(id, language).catch(() => ({ cast: [] })),
     ]);
     return { person, credits: (creditsRes.cast || []) as any[] };
   } catch {
@@ -39,7 +42,8 @@ export async function generateMetadata({ params }: PersonPageProps): Promise<Met
       data.person.biography || `${data.person.name} — filmography, known-for credits, and biography on CineStream.`
     ),
     path: `/person/${data.person.id}`,
-    image: data.person.profile_path ? getImageUrl(data.person.profile_path, 'w780') : null,
+    // No `image` here: this route has an opengraph-image.tsx that generates a dynamic
+    // profile card, and Next.js wires that up as the OG/Twitter image automatically.
     type: 'profile',
   });
 }

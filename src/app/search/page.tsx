@@ -5,8 +5,10 @@ import { Search } from 'lucide-react';
 import { tmdbClient, getImageUrl } from '@/services/tmdb';
 import MovieCard from '@/components/MovieCard';
 import { buildMetadata } from '@/lib/metadata';
+import { getPreferredLanguage } from '@/lib/i18n-server';
 
-export const revalidate = 3600;
+// No `revalidate` export: reading the language cookie makes this route inherently
+// per-request (see src/lib/i18n-server.ts) — a static ISR interval would be misleading.
 
 const TABS = [
   { key: 'all', label: 'All Results' },
@@ -21,16 +23,16 @@ function resolveTab(raw?: string): TabKey {
   return (TABS.find((t) => t.key === raw)?.key || 'all') as TabKey;
 }
 
-function fetchResults(query: string, tab: TabKey) {
+function fetchResults(query: string, tab: TabKey, language: string) {
   switch (tab) {
     case 'movie':
-      return tmdbClient.searchMovies(query);
+      return tmdbClient.searchMovies(query, 1, language);
     case 'tv':
-      return tmdbClient.searchTV(query);
+      return tmdbClient.searchTV(query, 1, language);
     case 'person':
       return tmdbClient.searchPeople(query);
     default:
-      return tmdbClient.searchMulti(query);
+      return tmdbClient.searchMulti(query, 1, language);
   }
 }
 
@@ -55,8 +57,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const { q, type } = await searchParams;
   const query = q?.trim() || '';
   const activeTab = resolveTab(type);
+  const language = await getPreferredLanguage();
 
-  const res = query ? await fetchResults(query, activeTab).catch(() => ({ results: [] })) : { results: [] };
+  const res = query ? await fetchResults(query, activeTab, language).catch(() => ({ results: [] })) : { results: [] };
   const results = res.results || [];
 
   return (

@@ -4,8 +4,10 @@ import { Film, Flame, Star, Clapperboard, Calendar, ChevronLeft, ChevronRight } 
 import { tmdbClient } from '@/services/tmdb';
 import MovieCard from '@/components/MovieCard';
 import { buildMetadata } from '@/lib/metadata';
+import { getPreferredLanguage } from '@/lib/i18n-server';
 
-export const revalidate = 3600;
+// No `revalidate` export: reading the language cookie makes this route inherently
+// per-request (see src/lib/i18n-server.ts) — a static ISR interval would be misleading.
 
 const CATEGORIES = [
   { key: 'popular', label: 'Popular Movies', icon: Flame },
@@ -16,16 +18,16 @@ const CATEGORIES = [
 
 type CategoryKey = (typeof CATEGORIES)[number]['key'];
 
-function fetchMovies(category: CategoryKey, page: number) {
+function fetchMovies(category: CategoryKey, page: number, language: string) {
   switch (category) {
     case 'top_rated':
-      return tmdbClient.getMovieTopRated(page);
+      return tmdbClient.getMovieTopRated(page, language);
     case 'now_playing':
-      return tmdbClient.getMovieNowPlaying(page);
+      return tmdbClient.getMovieNowPlaying(page, language);
     case 'upcoming':
-      return tmdbClient.getMovieUpcoming(page);
+      return tmdbClient.getMovieUpcoming(page, language);
     default:
-      return tmdbClient.getMoviePopular(page);
+      return tmdbClient.getMoviePopular(page, language);
   }
 }
 
@@ -52,8 +54,9 @@ export default async function MoviesPage({ searchParams }: MoviesPageProps) {
   const { category: rawCategory, page: rawPage } = await searchParams;
   const category = resolveCategory(rawCategory);
   const page = Math.min(Math.max(parseInt(rawPage || '1', 10) || 1, 1), 500);
+  const language = await getPreferredLanguage();
 
-  const res = await fetchMovies(category, page);
+  const res = await fetchMovies(category, page, language);
   const movies = res.results || [];
   const totalPages = Math.min(res.total_pages || 1, 500);
 
